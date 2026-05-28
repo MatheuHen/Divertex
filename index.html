@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="neon">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Roleta de Vidas</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20100%20100%27%3E%3Ctext%20y%3D%27.9em%27%20font-size%3D%2790%27%3E%F0%9F%8E%A1%3C/text%3E%3C/svg%3E"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@400;600;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <section id="screenMenu" class="screen screen--active" aria-label="Menu Divertex">
+      <div class="menu">
+        <header class="menu__header">
+          <div class="menu__titleRow">
+            <div class="menu__title">Divertex</div>
+            <div class="menu__badge">minigames</div>
+          </div>
+          <div class="menu__subtitle">Gire, sobreviva e tente não se ferrar.</div>
+          <div id="authPanel" class="authPanelWrap"></div>
+        </header>
+
+        <div id="rankingSection" class="rankingSection">
+          <div class="rankingSection__title">🏆 Ranking Global</div>
+          <div id="rankingContainer" class="rankingContainer">
+            <p class="rankingEmpty">Configure o Supabase para ver o ranking.</p>
+          </div>
+        </div>
+
+        <div class="menu__grid" aria-label="Modalidades">
+          <article class="gameCard gameCard--primary">
+            <div class="gameCard__icon" aria-hidden="true">🎡</div>
+            <div class="gameCard__title">Roleta de Vidas</div>
+            <div class="gameCard__desc">
+              Cada jogador começa com corações. A roleta sorteia um nome e o jogador sorteado perde uma vida. Quem zerar é
+              eliminado.
+            </div>
+            <button id="openWheelBtn" class="btn btn--big" type="button">Jogar agora</button>
+            <div class="gameCard__hint">Atalho: Ctrl/⌘ + Enter (dentro do jogo) para girar.</div>
+          </article>
+
+          <article class="gameCard gameCard--locked" aria-disabled="true">
+            <div class="gameCard__icon" aria-hidden="true">🔫</div>
+            <div class="gameCard__title">Roleta Russa</div>
+            <div class="gameCard__desc">Em breve. Vai dar ruim.</div>
+            <button class="btn btn--ghost" type="button" disabled>Em breve</button>
+          </article>
+
+          <article class="gameCard gameCard--locked" aria-disabled="true">
+            <div class="gameCard__icon" aria-hidden="true">⏳</div>
+            <div class="gameCard__title">Tempo Maldito</div>
+            <div class="gameCard__desc">Em breve. O relógio não perdoa.</div>
+            <button class="btn btn--ghost" type="button" disabled>Em breve</button>
+          </article>
+
+          <article class="gameCard gameCard--locked" aria-disabled="true">
+            <div class="gameCard__icon" aria-hidden="true">🚫</div>
+            <div class="gameCard__title">Proibidona</div>
+            <div class="gameCard__desc">Em breve. Regras… questionáveis.</div>
+            <button class="btn btn--ghost" type="button" disabled>Em breve</button>
+          </article>
+
+          <article class="gameCard gameCard--locked" aria-disabled="true">
+            <div class="gameCard__icon" aria-hidden="true">💥</div>
+            <div class="gameCard__title">Pesadão</div>
+            <div class="gameCard__desc">Em breve. Modo hard sem dó.</div>
+            <button class="btn btn--ghost" type="button" disabled>Em breve</button>
+          </article>
+
+          <article class="gameCard gameCard--locked" aria-disabled="true">
+            <div class="gameCard__icon" aria-hidden="true">💞</div>
+            <div class="gameCard__title">Casal</div>
+            <div class="gameCard__desc">Em breve. Só para os corajosos.</div>
+            <button class="btn btn--ghost" type="button" disabled>Em breve</button>
+          </article>
+
+          <article class="gameCard gameCard--locked" aria-disabled="true">
+            <div class="gameCard__icon" aria-hidden="true">🌪️</div>
+            <div class="gameCard__title">Caos Total</div>
+            <div class="gameCard__desc">Em breve. Zero controle, 100% caos.</div>
+            <button class="btn btn--ghost" type="button" disabled>Em breve</button>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="screenWheel" class="screen" aria-label="Modalidade Roleta de Vidas">
+      <div class="app">
+        <header class="topbar">
+          <div class="brand">
+            <div class="brand__title">Roleta de Vidas</div>
+            <div class="brand__subtitle">Divertex • sorteia, perde coração, elimina. Sem dó.</div>
+          </div>
+
+          <div class="topbar__controls">
+            <label class="field field--inline">
+              <span class="field__label">Tema</span>
+              <select id="themeSelect" class="input">
+                <option value="neon">Neon Arcade</option>
+                <option value="darklove">Dark Love</option>
+                <option value="caos">Caos</option>
+                <option value="casal">Casal</option>
+                <option value="minimal">Minimal</option>
+              </select>
+            </label>
+
+            <label class="toggle">
+              <input id="soundToggle" type="checkbox" />
+              <span class="toggle__ui"></span>
+              <span class="toggle__text">Som</span>
+            </label>
+
+            <button id="backToMenuBtn" class="btn btn--ghost" type="button">Voltar ao menu</button>
+            <button id="resetBtn" class="btn btn--ghost" type="button">Resetar jogo</button>
+            <button id="saveSessionBtn" class="btn btn--ghost" type="button" title="Requer login">💾 Salvar</button>
+          </div>
+        </header>
+
+        <main class="layout">
+          <section class="panel">
+            <div class="panel__title">Jogadores</div>
+
+            <form id="addPlayerForm" class="card" autocomplete="off">
+              <div class="grid2">
+                <label class="field">
+                  <span class="field__label">Nome</span>
+                  <input id="nameInput" class="input" type="text" placeholder="Ex.: Matheus" maxlength="28" required />
+                </label>
+
+                <label class="field">
+                  <span class="field__label">Vidas</span>
+                  <input id="livesInput" class="input" type="number" min="1" max="20" value="3" required />
+                </label>
+              </div>
+
+              <div class="row">
+                <button id="addPlayerBtn" class="btn" type="submit">Adicionar jogador</button>
+                <button id="addSampleBtn" class="btn btn--soft" type="button">Adicionar exemplos</button>
+              </div>
+
+              <div class="hint">
+                Dica: no Modo Tempo, a penalidade (perda de 1 vida) acontece quando o cronômetro chegar a 0.
+              </div>
+            </form>
+
+            <div class="card">
+              <div class="panel__subhead">
+                <div>Lista</div>
+                <div class="pill" id="playersCountPill">0 ativos</div>
+              </div>
+              <div id="playersList" class="players"></div>
+            </div>
+
+            <details class="card details" id="customEditorPanel">
+              <summary class="details__summary">Roleta personalizada (itens, um por linha)</summary>
+              <textarea
+                id="customWheelInput"
+                class="textarea"
+                rows="5"
+                spellcheck="false"
+                placeholder="Ex.: Beba um gole&#10;Ex.: Conta um segredo"
+              ></textarea>
+              <div class="row">
+                <button id="updateCustomWheelBtn" class="btn btn--soft" type="button">Salvar itens</button>
+              </div>
+            </details>
+
+            <details class="card details" open>
+              <summary class="details__summary">Brincadeiras (uma por linha)</summary>
+              <textarea
+                id="challengesInput"
+                class="textarea"
+                rows="7"
+                spellcheck="false"
+                placeholder="Ex.: Imitar um animal por 5s&#10;Ex.: Falar com sotaque até a próxima rodada"
+              ></textarea>
+              <div class="row">
+                <button id="updateChallengesBtn" class="btn btn--soft" type="button">Atualizar brincadeiras</button>
+                <button id="shuffleChallengesBtn" class="btn btn--ghost" type="button">Embaralhar</button>
+              </div>
+            </details>
+          </section>
+
+          <section class="stage">
+            <div class="stage__top">
+              <div class="card config">
+                <div class="panel__subhead">
+                  <div>Configuração da Rodada</div>
+                  <div class="pill pill--soft" id="roundModePill">Normal</div>
+                </div>
+
+                <div class="configTop">
+                  <label class="field">
+                    <span class="field__label">Modo</span>
+                    <select id="roundModeSelect" class="input">
+                      <option value="normal">Normal</option>
+                      <option value="tempo">Tempo</option>
+                      <option value="desafio">Desafio</option>
+                      <option value="leve">Leve</option>
+                      <option value="medio">Médio</option>
+                      <option value="dificil">Difícil</option>
+                      <option value="pesadao">Pesadão</option>
+                      <option value="proibidona">Proibidona 18+</option>
+                      <option value="casal">Casal</option>
+                      <option value="criativo">Criativo</option>
+                      <option value="personalizado">Personalizado</option>
+                    </select>
+                  </label>
+
+                  <label class="field">
+                    <span class="field__label">Segundos <span class="field__hint">(manual ou sorteado)</span></span>
+                    <input id="timerSecondsInput" class="input" type="number" min="1" max="600" value="10" />
+                  </label>
+                </div>
+
+                <div class="configActions">
+                  <button id="verManualBtn" class="btn btn--ghost btn--sm" type="button">📖 Ver manual do modo</button>
+                </div>
+
+                <div class="configSplit">
+                  <div class="configCol">
+                    <div class="field__label">Roletas Ativas</div>
+                    <div class="checks">
+                      <label class="check">
+                        <input id="wheelPlayers" type="checkbox" checked disabled />
+                        <span>Jogadores</span>
+                      </label>
+                      <label class="check">
+                        <input id="wheelLives" type="checkbox" checked />
+                        <span>Vidas</span>
+                      </label>
+                      <label class="check">
+                        <input id="wheelQuestions" type="checkbox" />
+                        <span>Perguntas</span>
+                      </label>
+                      <label class="check">
+                        <input id="wheelChallenges" type="checkbox" checked />
+                        <span>Desafios</span>
+                      </label>
+                      <label class="check">
+                        <input id="wheelTime" type="checkbox" />
+                        <span>Tempo</span>
+                      </label>
+                      <label class="check">
+                        <input id="wheelPercent" type="checkbox" />
+                        <span>Porcentagem</span>
+                      </label>
+                      <label class="check">
+                        <input id="wheelNumber" type="checkbox" />
+                        <span>Número</span>
+                      </label>
+                      <label class="check">
+                        <input id="wheelPenalty" type="checkbox" />
+                        <span>Penalidade</span>
+                      </label>
+                      <label class="check">
+                        <input id="wheelBonus" type="checkbox" />
+                        <span>Bônus</span>
+                      </label>
+                      <label class="check">
+                        <input id="wheelCustom" type="checkbox" />
+                        <span>Personalizada</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="wheelWrap">
+              <canvas id="wheelCanvas" class="wheel" width="640" height="640"></canvas>
+              <div class="pointer" aria-hidden="true"></div>
+              <div id="countdown" class="countdown" hidden>
+                <div class="countdown__ring">
+                  <svg viewBox="0 0 120 120" class="ring">
+                    <circle class="ring__bg" cx="60" cy="60" r="50"></circle>
+                    <circle id="ringProgress" class="ring__fg" cx="60" cy="60" r="50"></circle>
+                  </svg>
+                  <div class="countdown__value" id="countdownValue">10</div>
+                </div>
+                <div class="countdown__label">Tempo do sorteado</div>
+                <button id="endTurnBtn" class="btn btn--soft" type="button">Encerrar turno</button>
+              </div>
+            </div>
+
+            <div class="actions">
+              <button id="spinBtn" class="btn btn--big" type="button">Girar</button>
+            </div>
+
+            <div class="results">
+              <div class="resultCard card">
+                <div class="resultCard__title">Resultado da Rodada</div>
+                <div id="resultName" class="resultCard__name">—</div>
+                <div id="resultMessage" class="resultCard__msg">Adicione jogadores e gire a roleta.</div>
+                <div id="roundResultGrid" class="roundResultGrid"></div>
+                <div id="resultChallenge" class="resultCard__challenge" hidden></div>
+
+                <div id="actionBtns" class="actionBtns" hidden>
+                  <button id="cumpriumBtn" class="btn btn--success" type="button">Cumpriu ✓</button>
+                  <button id="respondeuBtn" class="btn btn--success" type="button">Respondeu ✓</button>
+                  <button id="falhouBtn" class="btn btn--danger" type="button">Falhou ✗</button>
+                  <button id="pulouBtn" class="btn btn--danger" type="button">Pulou ✗</button>
+                  <button id="applyPenaltyBtn" class="btn btn--warning" type="button">Aplicar penalidade</button>
+                </div>
+                <button id="spinAgainBtn" class="btn btn--ghost spinAgainBtn" type="button" hidden>↺ Girar novamente</button>
+              </div>
+
+              <div class="card rules">
+                <div class="panel__subhead">
+                  <div>Regras rápidas</div>
+                  <div class="pill pill--soft">1 rodada = 1 vida</div>
+                </div>
+                <ul class="rules__list">
+                  <li>Clássico: parou, perdeu 1 vida automaticamente.</li>
+                  <li>Modo Tempo: sorteia e inicia contagem; ao zerar, perde 1 vida.</li>
+                  <li>Com 0 vidas, o jogador é eliminado e sai da roleta.</li>
+                </ul>
+              </div>
+
+              <details class="card details" id="historyPanel">
+                <summary class="details__summary">
+                  Histórico de rodadas
+                  <button id="exportHistoryBtn" class="btn btn--ghost btn--sm historyExportBtn" type="button">Exportar</button>
+                </summary>
+                <div id="historyList" class="historyList"></div>
+              </details>
+            </div>
+          </section>
+        </main>
+      </div>
+    </section>
+
+    <!-- Modal 18+ -->
+    <div id="modal18" class="modal" hidden role="dialog" aria-modal="true">
+      <div class="modal__box">
+        <div class="modal__icon">🔞</div>
+        <div class="modal__title">Conteúdo adulto</div>
+        <div class="modal__body">Este modo contém perguntas e desafios para maiores de 18 anos. Confirme que você tem 18 anos ou mais para continuar.</div>
+        <div class="modal__actions">
+          <button id="modal18ConfirmBtn" class="btn btn--danger" type="button">Tenho 18+ anos</button>
+          <button id="modal18CancelBtn" class="btn btn--ghost" type="button">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Manual do Modo -->
+    <div id="modalManual" class="modal" hidden role="dialog" aria-modal="true">
+      <div class="modal__box modal__box--wide">
+        <div id="modalManualContent" class="modal__manual"></div>
+        <button id="modalManualCloseBtn" class="btn btn--ghost" type="button">Fechar</button>
+      </div>
+    </div>
+
+    <!-- Overlay de vitória -->
+    <div id="victoryOverlay" class="victoryOverlay" hidden>
+      <div class="victoryOverlay__content">
+        <div class="victoryOverlay__emoji">🏆</div>
+        <div id="victoryOverlay__name" class="victoryOverlay__name"></div>
+        <div class="victoryOverlay__msg">Venceu! Último sobrevivente.</div>
+        <button id="victoryCloseBtn" class="btn btn--big" type="button">Jogar novamente</button>
+      </div>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+    <script type="module" src="./js/supabase-integration.js"></script>
+  </body>
+</html>
