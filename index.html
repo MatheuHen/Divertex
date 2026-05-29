@@ -88,6 +88,13 @@
             <div class="gameCard__desc">Todas as rodas ativas. Criativo, aleatório e imprevisível. Zero controle, 100% diversão.</div>
             <button class="btn btn--big openModeBtn" data-mode="criativo" type="button">Jogar agora</button>
           </article>
+
+          <article class="gameCard gameCard--likely">
+            <div class="gameCard__icon" aria-hidden="true">🤔</div>
+            <div class="gameCard__title">Quem é Mais Provável</div>
+            <div class="gameCard__desc">O grupo vota em quem é mais provável de fazer cada coisa. Mais votado perde uma vida. Último de pé vence.</div>
+            <button id="openLikelyBtn" class="btn btn--big" type="button">Jogar agora</button>
+          </article>
         </div>
       </div>
     </section>
@@ -338,6 +345,101 @@
       </div>
     </section>
 
+    <!-- Tela: Quem é Mais Provável -->
+    <section id="screenLikely" class="screen" aria-label="Quem é Mais Provável">
+      <div class="lk-app">
+        <header class="topbar">
+          <div class="brand">
+            <div class="brand__title">Quem é Mais Provável</div>
+            <div class="brand__subtitle">Divertex • O grupo vota. Mais votado perde uma vida.</div>
+          </div>
+          <div class="topbar__controls">
+            <button id="likelyBackMenuBtn" class="btn btn--ghost" type="button">Voltar ao menu</button>
+          </div>
+        </header>
+
+        <!-- Fase: Setup -->
+        <div id="likelySetup" class="lk-phase">
+          <div class="lk-setup-grid">
+            <div class="card lk-setup-left">
+              <div class="panel__title">Jogadores</div>
+              <form id="likelyPlayerForm" autocomplete="off">
+                <div class="lk-form-row">
+                  <input id="likelyNameInput" class="input" type="text" placeholder="Nome do jogador" maxlength="20" required />
+                  <button class="btn" type="submit">Adicionar</button>
+                </div>
+              </form>
+              <button id="likelyAddSampleBtn" class="btn btn--soft lk-sample-btn" type="button">Adicionar exemplos</button>
+              <div id="likelyPlayersList" class="lk-chips-list"></div>
+              <p class="lk-player-info">Cada jogador começa com <strong>3 ❤️</strong>. Mais votado perde 1 vida. 0 vidas = eliminado.</p>
+            </div>
+            <div class="card lk-setup-right">
+              <div class="panel__title">Configuração</div>
+              <label class="field">
+                <span class="field__label">Número de rodadas</span>
+                <input id="likelyRoundsInput" class="input" type="number" min="3" max="20" value="5" />
+              </label>
+              <div class="lk-setup-rules">
+                <div class="lk-rule-item">🎯 Uma pergunta por rodada</div>
+                <div class="lk-rule-item">🗳️ Todos votam em quem é mais provável</div>
+                <div class="lk-rule-item">❤️ Mais votado perde 1 vida</div>
+                <div class="lk-rule-item">💀 0 vidas = eliminado</div>
+                <div class="lk-rule-item">🏆 Último de pé vence</div>
+              </div>
+              <button id="likelyStartBtn" class="btn btn--big" type="button" disabled>Começar jogo</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fase: Pergunta / Votação -->
+        <div id="likelyQuestion" class="lk-phase" hidden>
+          <div class="lk-q-wrap">
+            <div class="card lk-q-card">
+              <div class="lk-round-badge" id="likelyQRound">Rodada 1 de 5</div>
+              <div class="lk-q-text" id="likelyQText"></div>
+              <p class="lk-vote-hint">👇 Toque no nome de quem você acha mais provável</p>
+              <div id="likelyVoteGrid" class="lk-vote-grid"></div>
+              <div class="lk-q-actions">
+                <button id="likelyRevealBtn" class="btn btn--big lk-reveal-trigger" type="button">🎯 Revelar resultado</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fase: Revelação -->
+        <div id="likelyReveal" class="lk-phase" hidden>
+          <div class="lk-reveal-wrap">
+            <div class="card lk-reveal-card">
+              <div class="lk-reveal-label">O grupo decidiu que...</div>
+              <div class="lk-reveal-name" id="likelyRevealName"></div>
+              <div class="lk-reveal-votes" id="likelyRevealVotes"></div>
+              <div class="lk-reveal-msg" id="likelyRevealMsg"></div>
+              <div id="likelyRevealBreakdown" class="lk-breakdown"></div>
+              <div id="likelyScoreBoard" class="lk-scoreboard"></div>
+              <button id="likelyNextRoundBtn" class="btn btn--big" type="button">Próxima rodada →</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fase: Final -->
+        <div id="likelyFinal" class="lk-phase" hidden>
+          <div class="lk-final-wrap">
+            <div class="card lk-final-card">
+              <div class="lk-final-trophy">🏆</div>
+              <div class="lk-final-label">Sobrevivente!</div>
+              <div class="lk-final-winner" id="likelyFinalWinner"></div>
+              <div class="lk-final-sub">O último jogador de pé</div>
+              <div id="likelyFinalScores" class="lk-final-scores"></div>
+              <div class="lk-final-actions">
+                <button id="likelyPlayAgainBtn" class="btn btn--big" type="button">Jogar novamente</button>
+                <button id="likelyBackMenuFinalBtn" class="btn btn--ghost" type="button">Voltar ao menu</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Modal 18+ -->
     <div id="modal18" class="modal" hidden role="dialog" aria-modal="true">
       <div class="modal__box">
@@ -371,5 +473,6 @@
 
     <script type="module" src="./app.js"></script>
     <script type="module" src="./js/supabase-integration.js"></script>
+    <script type="module" src="./js/likely-game.js"></script>
   </body>
 </html>

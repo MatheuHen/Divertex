@@ -145,15 +145,29 @@ npx vercel alias divertex-kappa-tawny.vercel.app divertex-kappa.vercel.app
 
 ## 7. O que falta do escopo do PDF e vamos implementar
 
-O PDF (Divertex_Especificacao_Claude.pdf) listava 8 minigames no menu. Implementamos a Roleta de Vidas completa + 6 variantes dela. Os minigames abaixo são **jogos separados com lógica própria** — não são modos internos da Roleta de Vidas — e ainda não existem:
+O PDF (Divertex_Especificacao_Claude.pdf) listava 8 minigames no menu. Implementamos a Roleta de Vidas completa + 6 variantes dela + "Quem é Mais Provável". Os minigames abaixo ainda não existem:
 
-| Minigame | Mecânica (conforme PDF) | Complexidade |
-|----------|------------------------|--------------|
-| **Verdade ou Caos** | Perguntas diretas, desafios e escolhas perigosas — grupo decide o destino | Média |
-| **Quem é Mais Provável** | O grupo vota em qual jogador mais se encaixa em cada situação; quem ganhar mais votos paga | Média |
-| **Cartas do Caos** | Baralho de cartas aleatórias que mudam as regras da partida a cada rodada | Alta |
-| **Duelo de Coragem** | Dois jogadores sorteados se enfrentam em desafios 1v1 | Média |
-| **Mestre da Rodada** | Um jogador vira "mestre" e cria regras temporárias que os outros devem obedecer | Alta |
+| Minigame | Mecânica (conforme PDF) | Complexidade | Status |
+|----------|------------------------|--------------|--------|
+| **Quem é Mais Provável** | Grupo vota em quem é mais provável; mais votado perde vida | Média | ✅ Implementado (2026-05-28) |
+| **Verdade ou Caos** | Perguntas diretas, desafios e escolhas perigosas — grupo decide o destino | Média | ❌ Pendente |
+| **Cartas do Caos** | Baralho de cartas aleatórias que mudam as regras da partida a cada rodada | Alta | ❌ Pendente |
+| **Duelo de Coragem** | Dois jogadores sorteados se enfrentam em desafios 1v1 | Média | ❌ Pendente |
+| **Mestre da Rodada** | Um jogador vira "mestre" e cria regras temporárias que os outros devem obedecer | Alta | ❌ Pendente |
+
+### Quem é Mais Provável — detalhes da implementação
+
+| Arquivo | O que faz |
+|---------|-----------|
+| `js/likely-game.js` | IIFE autônomo: banco de 60+ perguntas, 4 fases (setup/question/reveal/final), votação ao vivo, eliminação por vidas, placar |
+| `index.html` | Novo card no menu (`#openLikelyBtn`) + seção `#screenLikely` com 4 fases |
+| `styles.css` | ~200 linhas de CSS dedicado (prefixo `lk-`) — temas, animações, responsivo 640px |
+
+**Fluxo do jogo:**
+1. Setup: adicionar 2–8 jogadores, definir rodadas (3–20). Cada jogador começa com 3 ❤️.
+2. Pergunta: todos votam clicando no nome de quem acham mais provável. Votos aparecem ao vivo.
+3. Revelar: animação dramática do mais votado. Perde 1 vida. 0 vidas = eliminado.
+4. Após todas as rodadas ou 1 sobrevivente: tela final com placar.
 
 ### Outras pendências do escopo
 
@@ -170,11 +184,11 @@ O PDF (Divertex_Especificacao_Claude.pdf) listava 8 minigames no menu. Implement
 
 ## 8. Próximo passo exato (sugerido)
 
-**Opção A — novos minigames** (maior impacto visual no menu):
-Implementar "Quem é Mais Provável" como segunda tela de jogo independente, com votação em grupo, resultado dramático e integração Supabase.
+**Opção A — UI de amizades** (complementa o sistema de ranking):
+Criar painel de amigos: buscar por nome, enviar pedido, aceitar/recusar, ver ranking entre amigos. Backend (`js/friends-service.js`) 100% pronto.
 
-**Opção B — UI de amizades** (complementa o sistema de ranking):
-Criar painel de amigos: buscar por nome, enviar pedido, aceitar/recusar, ver ranking entre amigos.
+**Opção B — Verdade ou Caos** (segundo minigame independente):
+Perguntas diretas ao grupo com votação "Verdade" ou "Caos"; quem fugir paga.
 
 **Opção C — Google OAuth** (melhora conversão de cadastro):
 Ativar no Google Cloud Console + Supabase Dashboard + reativar botão na `auth-ui.js`.
