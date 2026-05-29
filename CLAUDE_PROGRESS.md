@@ -1,96 +1,190 @@
-# CLAUDE_PROGRESS.md
+# CLAUDE_PROGRESS.md — Divertex
 
-## Projeto: Divertex — Roleta de Vidas
-
-### Status: PRODUÇÃO ATIVA ✅
-
----
-
-## Estado atual (2026-05-28)
-
-- **Deploy live:** https://divertex-kappa.vercel.app
-- **GitHub:** https://github.com/MatheuHen/Divertex
-- **Supabase:** projeto ativo em São Paulo, migration aplicada
-- **Auth:** e-mail + senha com confirmação de e-mail ativo
-- **Google OAuth:** removido da UI por ora (provider não configurado no Supabase)
+**Atualizado em:** 2026-05-28  
+**Status geral:** PRODUÇÃO ATIVA ✅  
+**URL pública:** https://divertex-kappa.vercel.app  
+**GitHub:** https://github.com/MatheuHen/Divertex  
 
 ---
 
-## Bugs corrigidos em produção
+## 1. Arquivos do projeto e estado atual
 
-| Bug | Causa | Fix |
-|-----|-------|-----|
-| Clique em "Jogar agora" bloqueado | `.modal{display:flex}` sobrescreve `[hidden]` | `[hidden]{display:none!important}` global |
-| Ranking não aparecia para visitantes | `renderGlobalRanking()` só rodava pós-login | Chamada adicionada no `init()` |
+| Arquivo | O que faz | Status |
+|---------|-----------|--------|
+| `index.html` | Markup completo: menu, tela de jogo, modais, todos os cards | ✅ |
+| `app.js` | IIFE única com todo o motor do jogo (1 750+ linhas) | ✅ |
+| `styles.css` | Temas neon/darklove/caos/casal/minimal, animações, responsivo | ✅ |
+| `vite.config.js` | Root `.`, outDir `dist` | ✅ |
+| `vercel.json` | buildCommand `npm run build`, outputDirectory `dist`, SPA rewrite | ✅ |
+| `package.json` | vite@^6.4.2, @supabase/supabase-js@^2.39.3 | ✅ |
+| `.gitignore` | Exclui node_modules/, dist/, .env* | ✅ |
+| `.env.example` | Template público com placeholders | ✅ |
+| `supabase/migrations/001_schema.sql` | Schema completo: 5 tabelas + VIEW + RLS + triggers + RPC | ✅ |
+| `js/supabase-client.js` | Cria cliente com fallback hardcoded (chave pública anon) | ✅ |
+| `js/auth-service.js` | signUp, signIn, signOut, getSession, getProfile, onAuthStateChange + traduções pt-BR | ✅ |
+| `js/auth-ui.js` | Modal login/cadastro, authBar logado/deslogado | ✅ |
+| `js/game-service.js` | saveSession, loadSession, saveRound, submitGameStats | ✅ |
+| `js/ranking-service.js` | getGlobalRanking, getFriendsRanking, getMyStats | ✅ |
+| `js/friends-service.js` | sendFriendRequest, respondFriendRequest, listFriends, searchUsers | ✅ |
+| `js/supabase-integration.js` | Cola Supabase ao app: ranking no init, hooks onRoundComplete/onWinner | ✅ |
+
+---
+
+## 2. O que está funcionando em produção (verificado com Playwright)
+
+### Menu e navegação
+- [x] Menu Divertex abre primeiro — nunca abre login forçado
+- [x] 7 cards no menu: 1 principal + 6 modos ativos (zero "Em breve")
+- [x] Cada card do menu abre o jogo com o modo pré-definido correto
+- [x] Card Proibidona abre modal de confirmação 18+ antes de entrar
+- [x] Voltar ao menu não quebra nenhum estado
+
+### Roleta de Vidas — motor do jogo
+- [x] 11 modos internos funcionando: Normal, Tempo, Desafio, Leve, Médio, Difícil, Pesadão, Proibidona 18+, Casal, Criativo, Personalizado
+- [x] 10 roletas configuráveis: Jogadores, Vidas, Perguntas, Desafios, Tempo, Porcentagem, Número, Penalidade, Bônus, Personalizada
+- [x] Giro bloqueia durante animação (sem duplo clique)
+- [x] Vida não desconta duas vezes no mesmo giro (spinId guard)
+- [x] Encerrar rodada não desconta vida
+- [x] Falhou/Pulou aplica penalidade uma única vez
+- [x] Eliminado sai da roleta imediatamente
+- [x] Vencedor aparece com confete quando resta 1 jogador
+- [x] Reset limpa todos os estados
+- [x] Cronômetro para ao encerrar turno (Escape ou botão)
+- [x] Botões: Cumpriu, Respondeu, Falhou, Pulou, Aplicar penalidade, Encerrar turno, Girar novamente
+- [x] Botão "Ver manual" com regras de cada modo
+- [x] Resultado da rodada mostra: jogador, modo, pergunta, desafio, tempo, porcentagem, número, penalidade, bônus — sem "Em breve"
+- [x] Histórico de rodadas + exportação em .txt
+
+### Banco de conteúdo
+- [x] 100+ perguntas por categoria: leve, médio, difícil, pesadão, proibidona (18+), casal, criativo
+- [x] 40+ desafios por categoria em todos os modos
+- [x] Penalidades e bônus padrão sorteados corretamente
+- [x] Personalizado: editor livre com localStorage
+
+### Visual e UX
+- [x] 5 temas: Neon Arcade, Dark Love, Caos, Casal, Minimal
+- [x] Animação de dano (shake + coração sumindo)
+- [x] Confete ao vencer
+- [x] Sons opcionais (giro, resultado)
+- [x] Responsivo mobile (390px testado)
+- [x] `[hidden]{display:none!important}` global — corrige overlay bloqueando cliques
+
+### Supabase e Auth
+- [x] Supabase conectado (chave pública hardcoded como fallback — nunca expõe service_role)
+- [x] Ranking global carrega sem login (query pública via VIEW)
+- [x] Cadastro por e-mail + senha funcionando (envia e-mail de confirmação)
+- [x] Erros de auth traduzidos para pt-BR (invalid credentials, email inválido, senha curta etc.)
+- [x] Validação de formulário antes de chamar Supabase
+- [x] Modal fecha ao clicar fora ou no X
+- [x] Salvar partida sem login → alerta explicativo
+- [x] RLS em todas as 5 tabelas — sem exposição de dados privados
+
+---
+
+## 3. Deploy — Vercel
+
+| Item | Valor |
+|------|-------|
+| Plano | Hobby (gratuito) |
+| URL canônica | https://divertex-kappa.vercel.app |
+| Alias auxiliar | https://divertex-kappa-tawny.vercel.app |
+| GitHub repo | https://github.com/MatheuHen/Divertex (branch main) |
+| Env vars configuradas | `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` (criptografadas na Vercel, não commitadas) |
+| Chave no bundle | Fallback hardcoded em `js/supabase-client.js` (chave pública — correto para frontend) |
+
+**Atenção no deploy:** o auto-deploy do GitHub não garante as vars no Vite bundle. Procedimento correto:
+```
+npx vercel --prod
+npx vercel alias divertex-kappa-tawny.vercel.app divertex-kappa.vercel.app
+```
+
+---
+
+## 4. Supabase
+
+| Item | Status |
+|------|--------|
+| Projeto | Ativo (free tier, São Paulo) |
+| URL | `https://kqiucdydlybotnocowdu.supabase.co` (pública) |
+| Migration 001 | Aplicada (profiles, player_stats, friendships, game_sessions, session_rounds + VIEW ranking_global) |
+| RLS | Ativo em todas as tabelas |
+| Confirmação de e-mail | Ativa (usuário precisa clicar no link para logar) |
+| Ranking global | Carrega para todos os visitantes — VIEW pública LGPD-safe (sem e-mail) |
+
+---
+
+## 5. Status de cada feature de auth
+
+| Feature | Status | Detalhe |
+|---------|--------|---------|
+| Cadastro e-mail + senha | ✅ Funciona | Supabase envia e-mail de confirmação |
+| Login e-mail + senha | ✅ Funciona | Requer e-mail confirmado |
+| Perfil pós-login | ✅ Código pronto | authBar mostra nome + botão Sair; criação de perfil via trigger no Supabase |
+| Salvar sessão de jogo | ✅ Código pronto | Requer usuário logado |
+| Ranking pós-login | ✅ Atualiza automaticamente | |
+| Google OAuth | ❌ UI removida | Provider não ativado no Supabase (falta Client ID/Secret do Google Cloud) |
+| Amizades (UI) | ❌ Pendente | Backend (`js/friends-service.js`) 100% pronto; falta tela no frontend |
+| Edição de perfil | ❌ Pendente | `updateProfile()` existe no service; falta formulário na UI |
+
+---
+
+## 6. Bugs corrigidos em produção
+
+| Bug | Causa raiz | Fix aplicado |
+|-----|-----------|--------------|
+| Clique em "Jogar agora" bloqueado | `.modal{display:flex}` sobrescreve atributo `hidden` | `[hidden]{display:none!important}` global no CSS |
+| VictoryOverlay bloqueava cliques | Mesmo padrão acima | Mesmo fix global |
+| Ranking não aparecia sem login | `renderGlobalRanking()` só rodava dentro de `onAuthStateChange` | Chamada adicionada no `init()` |
+| "Supabase não configurado" em produção | Vite não recebe vars do Vercel no auto-deploy do GitHub | Fallback hardcoded (chave pública) em `supabase-client.js` |
 | Erros do Supabase em inglês | `error.message` raw do SDK | Mapa de tradução pt-BR em `auth-service.js` |
-| Botão Google chamava provider desativado | `signInWithGoogle()` sem Supabase configurado | Botão e handler removidos da UI |
+| Google OAuth chamava provider inativo | `signInWithGoogle()` sem provider configurado → erro 400 | Botão removido da UI; função mantida no service |
+| "Em breve" aparecia no resultado da rodada | `|| "Em breve"` hardcoded em `renderRoundResult()` | Substituído por `|| "—"` |
+| Cards do menu todos bloqueados | `gameCard--locked` + `disabled` em todos | Cards desbloqueados com `data-mode` + handler no `bindEvents()` |
 
 ---
 
-## Testes ao vivo (Playwright contra produção)
+## 7. O que falta do escopo do PDF e vamos implementar
 
-| Funcionalidade | Status | Observação |
-|----------------|--------|------------|
-| Menu inicial | ✅ | Sem erros de console |
-| Supabase conectado | ✅ | `GET /rest/v1/ranking_global` dispara no load |
-| Ranking global | ✅ | Carrega sem login; mostra "Nenhum dado ainda." (banco vazio) |
-| Modal login | ✅ | Sem botão Google, limpo |
-| Validação campos vazios | ✅ | "Preencha e-mail e senha." |
-| Login credenciais erradas | ✅ | "E-mail ou senha incorretos." (pt-BR) |
-| E-mail inválido | ✅ | "Formato de e-mail inválido." |
-| Senha curta | ✅ | "A senha deve ter pelo menos 6 caracteres." |
-| Cadastro com e-mail real | ✅ | "Conta criada! Verifique seu e-mail para ativar." |
-| Fechar modal (X / fora) | ✅ | Modal removido do DOM |
-| Salvar partida sem login | ✅ | Alert "Faça login para salvar a partida." |
-| 5 temas visuais | ✅ | neon, darklove, caos, casal, minimal |
-| 11 modos de jogo | ✅ | normal, tempo, desafio, leve, médio, difícil… |
-| Roleta com 4 jogadores | ✅ | Anima, card de resultado correto |
-| Mobile 390px | ✅ | Layout responsivo |
-| Perfil pós-login | ⚠️ | Requer conta confirmada; código pronto |
-| Amizades | ⚠️ | Serviço pronto (`js/friends-service.js`), sem UI frontend ainda |
-| Salvamento de sessão (logado) | ⚠️ | Requer conta confirmada; código pronto |
+O PDF (Divertex_Especificacao_Claude.pdf) listava 8 minigames no menu. Implementamos a Roleta de Vidas completa + 6 variantes dela. Os minigames abaixo são **jogos separados com lógica própria** — não são modos internos da Roleta de Vidas — e ainda não existem:
 
----
+| Minigame | Mecânica (conforme PDF) | Complexidade |
+|----------|------------------------|--------------|
+| **Verdade ou Caos** | Perguntas diretas, desafios e escolhas perigosas — grupo decide o destino | Média |
+| **Quem é Mais Provável** | O grupo vota em qual jogador mais se encaixa em cada situação; quem ganhar mais votos paga | Média |
+| **Cartas do Caos** | Baralho de cartas aleatórias que mudam as regras da partida a cada rodada | Alta |
+| **Duelo de Coragem** | Dois jogadores sorteados se enfrentam em desafios 1v1 | Média |
+| **Mestre da Rodada** | Um jogador vira "mestre" e cria regras temporárias que os outros devem obedecer | Alta |
 
-## Supabase — ✅ ATIVO
+### Outras pendências do escopo
 
-### Projeto
-- **Região:** South America (São Paulo)
-- **URL:** `https://kqiucdydlybotnocowdu.supabase.co`
-- **Migration 001:** aplicada (5 tabelas + VIEW + RLS + triggers + RPC)
-- **Confirmação de e-mail:** ativa (padrão do Supabase free tier)
-
-### Serviços implementados
-| Arquivo | Status |
-|---------|--------|
-| `js/supabase-client.js` | ✅ graceful degradation |
-| `js/auth-service.js` | ✅ signUp, signIn, signOut + traduções pt-BR |
-| `js/game-service.js` | ✅ saveSession, saveRound, submitGameStats |
-| `js/ranking-service.js` | ✅ getGlobalRanking, getFriendsRanking, getMyStats |
-| `js/friends-service.js` | ✅ backend pronto, sem UI |
-| `js/supabase-integration.js` | ✅ hooks onRoundComplete, onWinner, ranking no init |
-| `js/auth-ui.js` | ✅ modal login/cadastro, authBar logado/deslogado |
+| Item | Situação |
+|------|----------|
+| **UI de amizades** | Backend pronto (`js/friends-service.js`); falta tela: buscar usuário, enviar pedido, aceitar, listar amigos |
+| **Google OAuth** | Falta criar credenciais no Google Cloud Console e ativar provider no Supabase Dashboard |
+| **Perfil editável** | `updateProfile()` existe; falta formulário com campo de nome e avatar |
+| **Shield/Proteção de jogador** | Coluna `shield` existe no schema Supabase; nunca implementada na lógica do jogo |
+| **Salas multijogador** | Tabela `game_rooms` existe no Supabase; sem uso no frontend — permitiria criar salas para amigos entrarem |
+| **Roletas personalizadas salvas no Supabase** | Atualmente só salva no localStorage; schema `custom_wheels` existe mas não é usado |
 
 ---
 
-## Vercel — ✅ ATIVO
+## 8. Próximo passo exato (sugerido)
 
-- **URL:** https://divertex-kappa.vercel.app
-- **Plano:** Hobby (gratuito)
-- **Env vars:** `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` (via Vercel CLI, não commitadas)
-- **Auto-deploy:** cada push em `main` — note: usar `vercel --prod && vercel alias divertex-kappa-tawny.vercel.app divertex-kappa.vercel.app` para garantir env vars no bundle
+**Opção A — novos minigames** (maior impacto visual no menu):
+Implementar "Quem é Mais Provável" como segunda tela de jogo independente, com votação em grupo, resultado dramático e integração Supabase.
 
----
+**Opção B — UI de amizades** (complementa o sistema de ranking):
+Criar painel de amigos: buscar por nome, enviar pedido, aceitar/recusar, ver ranking entre amigos.
 
-## Próximos passos opcionais
-
-1. **UI de amizades** — tela para enviar/aceitar pedidos (backend pronto)
-2. **Google OAuth** — configurar Client ID/Secret no Google Cloud + Supabase
-3. **Testes pós-confirmação** — login, perfil, salvar sessão com conta real
+**Opção C — Google OAuth** (melhora conversão de cadastro):
+Ativar no Google Cloud Console + Supabase Dashboard + reativar botão na `auth-ui.js`.
 
 ---
 
-## Regras da sessão
-- Não tocar em .env real, tokens, chaves, billing, accounts, PATH, hooks globais
-- Confirmar antes de --force, reset, clean, delete destrutivo
-- `signInWithGoogle` em `auth-service.js` mantido para uso futuro
+## 9. Regras da sessão (não alterar sem confirmação)
+
+- Nunca commitar `.env` real, tokens, service_role, secrets ou senha
+- Nunca mexer em billing, plano pago, PATH global, hooks globais
+- Confirmar antes de `--force`, `reset --hard`, `clean`, `delete` destrutivo
+- `signInWithGoogle()` mantido em `auth-service.js` para quando Google OAuth for ativado
+- Deploy sempre via: `npx vercel --prod` → `npx vercel alias divertex-kappa-tawny.vercel.app divertex-kappa.vercel.app`
