@@ -49,6 +49,10 @@ html[data-theme="minimal"] {
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   font-family: var(--fontBody);
@@ -933,9 +937,6 @@ html[data-theme="darklove"] body {
 }
 
 /* ===== Modal ===== */
-.modal[hidden] {
-  display: none;
-}
 .modal {
   position: fixed;
   inset: 0;
