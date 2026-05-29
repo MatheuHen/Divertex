@@ -188,6 +188,22 @@
       "Você prefere romance ou pegação?",
       "Você já deu gelo em alguém?",
       "Quem da roda você não deixaria ver suas conversas?",
+      "Quem da roda você já transou?",
+      "Com quem da roda você teria um affair secreto?",
+      "Qual foi a situação mais quente que você já viveu?",
+      "Você já ficou com mais de uma pessoa no mesmo dia?",
+      "Qual o lugar mais inusitado onde você já ficou com alguém?",
+      "Quem da roda você acha que performa melhor na cama?",
+      "Você tem algum fetiche que nunca contou pra ninguém?",
+      "Qual a fantasia que você ainda não realizou?",
+      "Já mandou nudes para alguém da roda?",
+      "Quem da roda você acha que tem mais experiência?",
+      "Qual foi a noite mais louca que você já teve?",
+      "Você já ficou com alguém da sua turma de trabalho ou faculdade?",
+      "Qual o crush que você ainda não agiu?",
+      "Quem da roda você acha que iniciaria no relacionamento?",
+      "Você prefere ser dominante ou submisso?",
+      "Já traiu ou foi traído? Como foi?",
     ],
     casal: [
       "Qual foi a primeira coisa que você reparou em mim?",
@@ -262,6 +278,13 @@
       "Deixe o grupo escolher uma pergunta para você.",
       "Fique uma rodada sem poder pular.",
       "Conte uma história de beijo sem citar nomes.",
+      "Mande uma mensagem ousada para alguém do seu contato (sem mostrar a tela).",
+      "Faça uma pose sedutora por 5 segundos.",
+      "Sussurre algo provocante no ouvido de alguém da roda.",
+      "Deixe alguém da roda checar sua última conversa de WhatsApp.",
+      "Fale sobre sua última paquera com detalhes.",
+      "Imite alguém da roda sendo seduzido.",
+      "Dê um apelido ousado para alguém da roda.",
     ],
     casal: [
       "Faça um elogio sincero.",
@@ -1541,6 +1564,16 @@
     if (els.openWheelBtn) {
       els.openWheelBtn.addEventListener("click", () => showScreen("wheel"));
     }
+
+    // Cards de modalidade do menu — abre o jogo com o modo pré-definido
+    document.querySelectorAll(".openModeBtn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const mode = btn.dataset.mode || "normal";
+        showScreen("wheel");
+        setRoundMode(mode);
+      });
+    });
+
     if (els.backToMenuBtn) {
       els.backToMenuBtn.addEventListener("click", () => showScreen("menu"));
     }

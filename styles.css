@@ -1242,23 +1242,22 @@ html[data-theme="darklove"] body {
   margin: 0;
 }
 
-.gameCard--locked {
-  opacity: 0.72;
+.gameCard--18 {
+  border-color: rgba(255, 60, 100, 0.5);
+  background: linear-gradient(135deg, rgba(255, 30, 80, 0.08) 0%, var(--card) 60%);
 }
 
-.gameCard--locked::after {
-  content: "🔒";
-  position: absolute;
-  right: 16px;
-  top: 16px;
-  width: 36px;
-  height: 36px;
-  display: grid;
-  place-items: center;
-  border-radius: 14px;
-  background: rgba(0, 0, 0, 0.28);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  pointer-events: none;
+.badge18 {
+  display: inline-block;
+  background: #ff2e54;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  padding: 1px 6px;
+  border-radius: 6px;
+  vertical-align: middle;
+  margin-left: 4px;
+  letter-spacing: 0.5px;
 }
 
 .heartSvg {

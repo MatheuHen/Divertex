@@ -5,8 +5,8 @@ let _client = null;
 export function getClient() {
   if (_client) return _client;
 
-  const url = import.meta.env?.VITE_SUPABASE_URL ?? '';
-  const key = import.meta.env?.VITE_SUPABASE_ANON_KEY ?? '';
+  const url = import.meta.env?.VITE_SUPABASE_URL || 'https://kqiucdydlybotnocowdu.supabase.co';
+  const key = import.meta.env?.VITE_SUPABASE_ANON_KEY || 'sb_publishable_ztQMHGTXUwHdLDq_FK9NFw_kxiuLQoy';
 
   if (!url || !key) {
     return null;
