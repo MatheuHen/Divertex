@@ -9,22 +9,38 @@ import { isReady } from './supabase-client.js';
 import { onAuthStateChange, getProfile, signOut } from './auth-service.js';
 import { saveSession, saveRound, submitGameStats } from './game-service.js';
 import { getGlobalRanking } from './ranking-service.js';
-import { renderAuthPanel, updateAuthPanel } from './auth-ui.js';
+import { renderAuthPanel, updateAuthPanel, renderAuthGate } from './auth-ui.js';
 
 let currentSession = null;
 let currentSessionId = null;
 
 function getApp() { return window.DivertexApp || null; }
 
+function showAuthGate() {
+  const gate = document.getElementById('authGate');
+  if (gate) gate.removeAttribute('hidden');
+  renderAuthGate();
+}
+
+function hideAuthGate() {
+  const gate = document.getElementById('authGate');
+  if (gate) gate.setAttribute('hidden', '');
+  // Ativa a tela do menu
+  const menu = document.getElementById('screenMenu');
+  if (menu) menu.classList.add('screen--active');
+}
+
 // ---- Inicializa quando DOM estiver pronto ----
 async function init() {
   if (!isReady()) {
     console.log('[Divertex] Supabase não configurado — modo local ativo.');
+    hideAuthGate(); // Sem Supabase, deixa jogar sem login
     renderAuthPanel(null);
     return;
   }
 
-  renderAuthPanel(null);
+  // Mostra gate de login
+  showAuthGate();
 
   // Carrega ranking público na inicialização (não requer login)
   renderGlobalRanking();
@@ -37,9 +53,11 @@ async function init() {
       const profile = await getProfile(session.user.id);
       updateAuthPanel({ session, profile });
       await renderGlobalRanking();
+      hideAuthGate();
     } else {
       updateAuthPanel(null);
       currentSessionId = null;
+      showAuthGate();
     }
 
     // Expõe sessão para o app

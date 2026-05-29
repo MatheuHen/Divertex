@@ -1,6 +1,6 @@
 # CLAUDE_PROGRESS.md — Divertex
 
-**Atualizado em:** 2026-05-28  
+**Atualizado em:** 2026-05-29  
 **Status geral:** PRODUÇÃO ATIVA ✅  
 **URL pública:** https://divertex-kappa.vercel.app  
 **GitHub:** https://github.com/MatheuHen/Divertex  
@@ -106,10 +106,11 @@ npx vercel alias divertex-kappa-tawny.vercel.app divertex-kappa.vercel.app
 |------|--------|
 | Projeto | Ativo (free tier, São Paulo) |
 | URL | `https://kqiucdydlybotnocowdu.supabase.co` (pública) |
-| Migration 001 | Aplicada (profiles, player_stats, friendships, game_sessions, session_rounds + VIEW ranking_global) |
-| RLS | Ativo em todas as tabelas |
+| Migration 001 | ✅ Aplicada via MCP (2026-05-29) — profiles, player_stats, friendships, game_sessions, session_rounds + VIEW ranking_global |
+| GRANTs | ✅ `GRANT SELECT ON ranking_global, profiles, player_stats TO anon, authenticated` — ranking funciona sem login |
+| RLS | Ativo em todas as 5 tabelas |
 | Confirmação de e-mail | Ativa (usuário precisa clicar no link para logar) |
-| Ranking global | Carrega para todos os visitantes — VIEW pública LGPD-safe (sem e-mail) |
+| Ranking global | ✅ Carrega para todos via VIEW pública LGPD-safe (sem e-mail) |
 
 ---
 
@@ -182,7 +183,19 @@ O PDF (Divertex_Especificacao_Claude.pdf) listava 8 minigames no menu. Implement
 
 ---
 
-## 8. Próximo passo exato (sugerido)
+## 8. O que foi implementado em 2026-05-29
+
+| Feature | Detalhe |
+|---------|---------|
+| **Auth-first (login obrigatório)** | `#authGate` overlay `z-index:9900` — aparece antes de qualquer tela; `supabase-integration.js` oculta o gate só após auth |
+| **Menu reestruturado** | Removidos 6 cards de dificuldade (eram modos da Roleta, não minigames separados). Ficaram: Roleta de Vidas + Quem é Mais Provável + 3 "Em breve" |
+| **Difficulty picker visual** | Substitui o `<select>` por 10 botões pill com ícone. Select fica hidden para estado interno. Modo Tempo revela config de timer |
+| **Personalizado como toggle** | Botão toggle (não mais modo isolado). Quando ON: ativa custom editor + mescla perguntas/desafios custom ao modo atual |
+| **Mega UI** | Confetti burst + rain (220 partículas, círculos e retângulos), fanfare de vitória (Web Audio), shake no eliminado, animação entrada `victoryOverlay--show`, hover em cards e botões, `authGate` com orbes animados |
+| **Sons melhorados** | `playSound("spin")`, `result`, `eliminate`, `win` (fanfare), `click` — todos via Web Audio API sem lib |
+| **Banco corrigido** | Migration 001 aplicada via MCP — 5 tabelas + VIEW. GRANT ao anon/authenticated para o ranking carregar sem login |
+
+## 9. Próximo passo exato (sugerido)
 
 **Opção A — UI de amizades** (complementa o sistema de ranking):
 Criar painel de amigos: buscar por nome, enviar pedido, aceitar/recusar, ver ranking entre amigos. Backend (`js/friends-service.js`) 100% pronto.

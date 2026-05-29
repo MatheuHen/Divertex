@@ -17,7 +17,26 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <section id="screenMenu" class="screen screen--active" aria-label="Menu Divertex">
+    <!-- Auth Gate — exibido antes de qualquer tela até o usuário logar -->
+    <div id="authGate" class="authGate" role="dialog" aria-modal="true" aria-label="Autenticação Divertex">
+      <div class="authGate__bg">
+        <div class="authGate__orb authGate__orb--1"></div>
+        <div class="authGate__orb authGate__orb--2"></div>
+        <div class="authGate__orb authGate__orb--3"></div>
+      </div>
+      <div class="authGate__inner">
+        <div class="authGate__brand">
+          <div class="authGate__logo">🎡</div>
+          <div class="authGate__title">Divertex</div>
+          <div class="authGate__tagline">Minigames para todo o grupo</div>
+        </div>
+        <div class="authGate__card" id="authGateCard">
+          <div class="authGate__loading">Carregando…</div>
+        </div>
+      </div>
+    </div>
+
+    <section id="screenMenu" class="screen" aria-label="Menu Divertex">
       <div class="menu">
         <header class="menu__header">
           <div class="menu__titleRow">
@@ -36,64 +55,55 @@
         </div>
 
         <div class="menu__grid" aria-label="Modalidades">
+          <!-- Minigame 1: Roleta de Vidas -->
           <article class="gameCard gameCard--primary">
             <div class="gameCard__icon" aria-hidden="true">🎡</div>
             <div class="gameCard__title">Roleta de Vidas</div>
             <div class="gameCard__desc">
-              Cada jogador começa com corações. A roleta sorteia um nome e o jogador sorteado perde uma vida. Quem zerar é
-              eliminado.
+              Sorteio de jogadores com vidas. Escolha o nível de dificuldade, ative roletas extras e
+              personalize o jogo. Quem zerar as vidas é eliminado. Último de pé vence.
+            </div>
+            <div class="gameCard__diffRow">
+              <button class="diffPill openModeBtn" data-mode="leve" type="button">🌱 Leve</button>
+              <button class="diffPill openModeBtn" data-mode="medio" type="button">🔥 Médio</button>
+              <button class="diffPill openModeBtn" data-mode="dificil" type="button">💀 Difícil</button>
+              <button class="diffPill openModeBtn diffPill--18" data-mode="proibidona" type="button">🔞 18+</button>
+              <button class="diffPill openModeBtn" data-mode="casal" type="button">💞 Casal</button>
             </div>
             <button id="openWheelBtn" class="btn btn--big" type="button">Jogar agora</button>
             <div class="gameCard__hint">Atalho: Ctrl/⌘ + Enter (dentro do jogo) para girar.</div>
           </article>
 
-          <article class="gameCard">
-            <div class="gameCard__icon" aria-hidden="true">🔫</div>
-            <div class="gameCard__title">Roleta Russa</div>
-            <div class="gameCard__desc">Alta tensão. Penalidades pesadas, eliminação rápida. Só os fortes sobrevivem.</div>
-            <button class="btn btn--big openModeBtn" data-mode="pesadao" type="button">Jogar agora</button>
-          </article>
-
-          <article class="gameCard">
-            <div class="gameCard__icon" aria-hidden="true">⏳</div>
-            <div class="gameCard__title">Tempo Maldito</div>
-            <div class="gameCard__desc">O relógio corre e a pressão aumenta. Cumpra antes do timer zerar ou perca uma vida.</div>
-            <button class="btn btn--big openModeBtn" data-mode="tempo" type="button">Jogar agora</button>
-          </article>
-
-          <article class="gameCard gameCard--18">
-            <div class="gameCard__icon" aria-hidden="true">🚫</div>
-            <div class="gameCard__title">Proibidona <span class="badge18">+18</span></div>
-            <div class="gameCard__desc">Perguntas sem filtro. Verdades que você nunca quis contar. Só para adultos.</div>
-            <button class="btn btn--big openModeBtn" data-mode="proibidona" type="button">Entrar (18+)</button>
-          </article>
-
-          <article class="gameCard">
-            <div class="gameCard__icon" aria-hidden="true">💥</div>
-            <div class="gameCard__title">Pesadão</div>
-            <div class="gameCard__desc">Sem dó, sem frescura. Perguntas difíceis, desafios pesados e penalidades no estilo Divertex.</div>
-            <button class="btn btn--big openModeBtn" data-mode="dificil" type="button">Jogar agora</button>
-          </article>
-
-          <article class="gameCard">
-            <div class="gameCard__icon" aria-hidden="true">💞</div>
-            <div class="gameCard__title">Casal</div>
-            <div class="gameCard__desc">Para casais corajosos. Perguntas íntimas, desafios românticos e verdades que fortalecem (ou complicam).</div>
-            <button class="btn btn--big openModeBtn" data-mode="casal" type="button">Jogar agora</button>
-          </article>
-
-          <article class="gameCard">
-            <div class="gameCard__icon" aria-hidden="true">🌪️</div>
-            <div class="gameCard__title">Caos Total</div>
-            <div class="gameCard__desc">Todas as rodas ativas. Criativo, aleatório e imprevisível. Zero controle, 100% diversão.</div>
-            <button class="btn btn--big openModeBtn" data-mode="criativo" type="button">Jogar agora</button>
-          </article>
-
+          <!-- Minigame 2: Quem é Mais Provável -->
           <article class="gameCard gameCard--likely">
             <div class="gameCard__icon" aria-hidden="true">🤔</div>
             <div class="gameCard__title">Quem é Mais Provável</div>
-            <div class="gameCard__desc">O grupo vota em quem é mais provável de fazer cada coisa. Mais votado perde uma vida. Último de pé vence.</div>
+            <div class="gameCard__desc">O grupo vota em quem é mais provável de fazer cada coisa. Mais votado perde uma vida. 60+ perguntas. Último de pé vence.</div>
             <button id="openLikelyBtn" class="btn btn--big" type="button">Jogar agora</button>
+          </article>
+
+          <!-- Minigame 3: Verdade ou Caos (Em breve) -->
+          <article class="gameCard gameCard--soon">
+            <div class="gameCard__icon" aria-hidden="true">⚡</div>
+            <div class="gameCard__title">Verdade ou Caos <span class="badgeSoon">Em breve</span></div>
+            <div class="gameCard__desc">Perguntas diretas e escolhas perigosas. O grupo decide o destino de cada jogador.</div>
+            <button class="btn btn--big" type="button" disabled>Em desenvolvimento</button>
+          </article>
+
+          <!-- Minigame 4: Duelo de Coragem (Em breve) -->
+          <article class="gameCard gameCard--soon">
+            <div class="gameCard__icon" aria-hidden="true">⚔️</div>
+            <div class="gameCard__title">Duelo de Coragem <span class="badgeSoon">Em breve</span></div>
+            <div class="gameCard__desc">Dois jogadores sorteados se enfrentam em desafios 1v1. Só um sai vivo.</div>
+            <button class="btn btn--big" type="button" disabled>Em desenvolvimento</button>
+          </article>
+
+          <!-- Minigame 5: Cartas do Caos (Em breve) -->
+          <article class="gameCard gameCard--soon">
+            <div class="gameCard__icon" aria-hidden="true">🃏</div>
+            <div class="gameCard__title">Cartas do Caos <span class="badgeSoon">Em breve</span></div>
+            <div class="gameCard__desc">Baralho aleatório que muda as regras a cada rodada. Zero previsibilidade.</div>
+            <button class="btn btn--big" type="button" disabled>Em desenvolvimento</button>
           </article>
         </div>
       </div>
@@ -204,81 +214,110 @@
                   <div class="pill pill--soft" id="roundModePill">Normal</div>
                 </div>
 
-                <div class="configTop">
-                  <label class="field">
-                    <span class="field__label">Modo</span>
-                    <select id="roundModeSelect" class="input">
-                      <option value="normal">Normal</option>
-                      <option value="tempo">Tempo</option>
-                      <option value="desafio">Desafio</option>
-                      <option value="leve">Leve</option>
-                      <option value="medio">Médio</option>
-                      <option value="dificil">Difícil</option>
-                      <option value="pesadao">Pesadão</option>
-                      <option value="proibidona">Proibidona 18+</option>
-                      <option value="casal">Casal</option>
-                      <option value="criativo">Criativo</option>
-                      <option value="personalizado">Personalizado</option>
-                    </select>
-                  </label>
+                <!-- Select oculto para estado interno -->
+                <select id="roundModeSelect" class="input" style="display:none">
+                  <option value="normal">Normal</option>
+                  <option value="tempo">Tempo</option>
+                  <option value="desafio">Desafio</option>
+                  <option value="leve">Leve</option>
+                  <option value="medio">Médio</option>
+                  <option value="dificil">Difícil</option>
+                  <option value="pesadao">Pesadão</option>
+                  <option value="proibidona">Proibidona 18+</option>
+                  <option value="casal">Casal</option>
+                  <option value="criativo">Criativo</option>
+                </select>
 
+                <!-- Seletor visual de dificuldade -->
+                <div class="diffPicker" id="difficultyPicker">
+                  <div class="diffPicker__label">Nível de dificuldade</div>
+                  <div class="diffPicker__grid">
+                    <button class="diffBtn diffBtn--active" data-difficulty="normal" type="button">
+                      <span class="diffBtn__icon">🎲</span>
+                      <span class="diffBtn__name">Normal</span>
+                    </button>
+                    <button class="diffBtn" data-difficulty="leve" type="button">
+                      <span class="diffBtn__icon">🌱</span>
+                      <span class="diffBtn__name">Leve</span>
+                    </button>
+                    <button class="diffBtn" data-difficulty="medio" type="button">
+                      <span class="diffBtn__icon">🔥</span>
+                      <span class="diffBtn__name">Médio</span>
+                    </button>
+                    <button class="diffBtn" data-difficulty="dificil" type="button">
+                      <span class="diffBtn__icon">💀</span>
+                      <span class="diffBtn__name">Difícil</span>
+                    </button>
+                    <button class="diffBtn" data-difficulty="pesadao" type="button">
+                      <span class="diffBtn__icon">🔫</span>
+                      <span class="diffBtn__name">Pesadão</span>
+                    </button>
+                    <button class="diffBtn diffBtn--18" data-difficulty="proibidona" type="button">
+                      <span class="diffBtn__icon">🔞</span>
+                      <span class="diffBtn__name">18+</span>
+                    </button>
+                    <button class="diffBtn" data-difficulty="casal" type="button">
+                      <span class="diffBtn__icon">💞</span>
+                      <span class="diffBtn__name">Casal</span>
+                    </button>
+                    <button class="diffBtn" data-difficulty="criativo" type="button">
+                      <span class="diffBtn__icon">🌪️</span>
+                      <span class="diffBtn__name">Criativo</span>
+                    </button>
+                    <button class="diffBtn" data-difficulty="desafio" type="button">
+                      <span class="diffBtn__icon">💥</span>
+                      <span class="diffBtn__name">Desafio</span>
+                    </button>
+                    <button class="diffBtn" data-difficulty="tempo" type="button">
+                      <span class="diffBtn__icon">⏳</span>
+                      <span class="diffBtn__name">Tempo</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Config de timer (só aparece no modo Tempo) -->
+                <div id="timerConfig" hidden>
                   <label class="field">
                     <span class="field__label">Segundos <span class="field__hint">(manual ou sorteado)</span></span>
                     <input id="timerSecondsInput" class="input" type="number" min="1" max="600" value="10" />
                   </label>
                 </div>
 
+                <!-- Toggle Modo Personalizado -->
+                <div class="customModeBar" id="customModeBar">
+                  <div class="customModeBar__info">
+                    <span class="customModeBar__name">✏️ Modo Personalizado</span>
+                    <span class="customModeBar__desc">Ativa suas perguntas e desafios junto ao modo atual</span>
+                  </div>
+                  <button id="customModeToggleBtn" class="toggle toggle--custom" type="button" aria-pressed="false" title="Ativar modo personalizado">
+                    <span class="toggle__ui"></span>
+                    <span class="toggle__text">Som</span>
+                  </button>
+                </div>
+
                 <div class="configActions">
                   <button id="verManualBtn" class="btn btn--ghost btn--sm" type="button">📖 Ver manual do modo</button>
                 </div>
 
-                <div class="configSplit">
-                  <div class="configCol">
-                    <div class="field__label">Roletas Ativas</div>
-                    <div class="checks">
-                      <label class="check">
-                        <input id="wheelPlayers" type="checkbox" checked disabled />
-                        <span>Jogadores</span>
-                      </label>
-                      <label class="check">
-                        <input id="wheelLives" type="checkbox" checked />
-                        <span>Vidas</span>
-                      </label>
-                      <label class="check">
-                        <input id="wheelQuestions" type="checkbox" />
-                        <span>Perguntas</span>
-                      </label>
-                      <label class="check">
-                        <input id="wheelChallenges" type="checkbox" checked />
-                        <span>Desafios</span>
-                      </label>
-                      <label class="check">
-                        <input id="wheelTime" type="checkbox" />
-                        <span>Tempo</span>
-                      </label>
-                      <label class="check">
-                        <input id="wheelPercent" type="checkbox" />
-                        <span>Porcentagem</span>
-                      </label>
-                      <label class="check">
-                        <input id="wheelNumber" type="checkbox" />
-                        <span>Número</span>
-                      </label>
-                      <label class="check">
-                        <input id="wheelPenalty" type="checkbox" />
-                        <span>Penalidade</span>
-                      </label>
-                      <label class="check">
-                        <input id="wheelBonus" type="checkbox" />
-                        <span>Bônus</span>
-                      </label>
-                      <label class="check">
-                        <input id="wheelCustom" type="checkbox" />
-                        <span>Personalizada</span>
-                      </label>
+                <details class="configWheels" id="configWheelsDetails">
+                  <summary class="configWheels__summary">Roletas ativas</summary>
+                  <div class="configSplit">
+                    <div class="configCol">
+                      <div class="checks">
+                        <label class="check"><input id="wheelPlayers" type="checkbox" checked disabled /><span>Jogadores</span></label>
+                        <label class="check"><input id="wheelLives" type="checkbox" checked /><span>Vidas</span></label>
+                        <label class="check"><input id="wheelQuestions" type="checkbox" /><span>Perguntas</span></label>
+                        <label class="check"><input id="wheelChallenges" type="checkbox" checked /><span>Desafios</span></label>
+                        <label class="check"><input id="wheelTime" type="checkbox" /><span>Tempo</span></label>
+                        <label class="check"><input id="wheelPercent" type="checkbox" /><span>Porcentagem</span></label>
+                        <label class="check"><input id="wheelNumber" type="checkbox" /><span>Número</span></label>
+                        <label class="check"><input id="wheelPenalty" type="checkbox" /><span>Penalidade</span></label>
+                        <label class="check"><input id="wheelBonus" type="checkbox" /><span>Bônus</span></label>
+                        <label class="check"><input id="wheelCustom" type="checkbox" /><span>Personalizada</span></label>
+                      </div>
                     </div>
                   </div>
-                </div>
+                </details>
               </div>
             </div>
 

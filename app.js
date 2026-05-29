@@ -1161,6 +1161,7 @@
       custom: false,
     },
     customWheelItems: [],
+    customModeEnabled: false,
     roundResult: {
       player: null,
       mode: null,
@@ -1313,6 +1314,10 @@
     applyRoundModeConstraints();
     renderRoundResult();
     syncCustomEditorVisibility();
+    syncDifficultyPicker();
+    // Show/hide timer config based on mode
+    const timerConfig = document.getElementById("timerConfig");
+    if (timerConfig) timerConfig.hidden = state.roundMode !== "tempo";
   }
 
   function clearRoundResult() {
@@ -1491,14 +1496,23 @@
   }
 
   function pickQuestion() {
-    const list = QUESTIONS[state.roundMode] || [];
-    return list.length ? pickFrom(list) : null;
+    const modeQ = QUESTIONS[state.roundMode] || [];
+    if (!state.customModeEnabled || !state.customWheelItems.length) {
+      return modeQ.length ? pickFrom(modeQ) : null;
+    }
+    const combined = [...modeQ, ...state.customWheelItems.filter(Boolean)];
+    return combined.length ? pickFrom(combined) : null;
   }
 
   function pickChallengeForMode() {
     const modeList = CHALLENGES_BY_MODE[state.roundMode];
-    const list = modeList && modeList.length ? modeList : state.challenges;
-    return list.length ? pickFrom(list) : null;
+    const base = modeList && modeList.length ? modeList : state.challenges;
+    if (!state.customModeEnabled || !state.challenges.length) {
+      return base.length ? pickFrom(base) : null;
+    }
+    const uniqueCustom = state.challenges.filter(c => !base.includes(c));
+    const combined = [...base, ...uniqueCustom];
+    return combined.length ? pickFrom(combined) : null;
   }
 
   function pickPercent() {
@@ -1692,28 +1706,46 @@
     cvs.height = window.innerHeight;
     document.body.appendChild(cvs);
     const c = cvs.getContext("2d");
-    const colors = ["#ff3df2","#22e6ff","#ff6b35","#4ade80","#f59e0b","#a855f7","#fb4d89","#ffb703"];
-    const particles = Array.from({ length: 140 }, () => ({
-      x: Math.random() * cvs.width,
-      y: -10 - Math.random() * 120,
-      vx: (Math.random() - 0.5) * 5,
-      vy: 1.5 + Math.random() * 3.5,
-      color: colors[Math.floor(Math.random() * colors.length)],
-      w: 7 + Math.random() * 8,
-      h: 4 + Math.random() * 5,
-      rot: Math.random() * Math.PI * 2,
-      rotV: (Math.random() - 0.5) * 0.18,
-    }));
+    const colors = ["#ff3df2","#22e6ff","#ff6b35","#4ade80","#f59e0b","#a855f7","#fb4d89","#ffb703","#ffffff","#60a5fa"];
+
+    // Burst from center + rain from top
+    const burstX = cvs.width / 2, burstY = cvs.height * 0.45;
+    const particles = Array.from({ length: 220 }, (_, i) => {
+      const isBurst = i < 80;
+      const angle = isBurst ? (Math.random() * Math.PI * 2) : 0;
+      const speed = isBurst ? (4 + Math.random() * 10) : 0;
+      return {
+        x: isBurst ? burstX : Math.random() * cvs.width,
+        y: isBurst ? burstY : -10 - Math.random() * 200,
+        vx: isBurst ? Math.cos(angle) * speed : (Math.random() - 0.5) * 5,
+        vy: isBurst ? Math.sin(angle) * speed : 2 + Math.random() * 4,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        w: 6 + Math.random() * 10,
+        h: 3 + Math.random() * 6,
+        rot: Math.random() * Math.PI * 2,
+        rotV: (Math.random() - 0.5) * 0.22,
+        shape: Math.random() > 0.6 ? "circle" : "rect",
+        alpha: 1,
+      };
+    });
+
     let raf;
-    const deadline = nowMs() + 5500;
+    const deadline = nowMs() + 7000;
     const tick = () => {
       c.clearRect(0, 0, cvs.width, cvs.height);
-      const alive = particles.filter(p => p.y < cvs.height + 30);
+      const alive = particles.filter(p => p.y < cvs.height + 40 && p.alpha > 0.05);
       alive.forEach(p => {
-        p.x += p.vx; p.y += p.vy; p.vy += 0.04; p.rot += p.rotV;
-        c.save(); c.translate(p.x, p.y); c.rotate(p.rot);
+        p.x += p.vx; p.y += p.vy; p.vy += 0.055; p.rot += p.rotV;
+        p.vx *= 0.998;
+        if (p.y > cvs.height * 0.7) p.alpha = Math.max(0.05, p.alpha - 0.008);
+        c.save(); c.globalAlpha = p.alpha;
+        c.translate(p.x, p.y); c.rotate(p.rot);
         c.fillStyle = p.color;
-        c.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        if (p.shape === "circle") {
+          c.beginPath(); c.arc(0, 0, p.w / 2, 0, Math.PI * 2); c.fill();
+        } else {
+          c.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        }
         c.restore();
       });
       if (alive.length && nowMs() < deadline) { raf = requestAnimationFrame(tick); }
@@ -1737,7 +1769,11 @@
     if (!els.victoryOverlay) return;
     els.victoryOverlayName.textContent = name;
     els.victoryOverlay.hidden = false;
+    els.victoryOverlay.classList.remove("victoryOverlay--show");
+    void els.victoryOverlay.offsetWidth;
+    els.victoryOverlay.classList.add("victoryOverlay--show");
     launchConfetti();
+    playSound("win");
   }
 
   // ===== Histórico (Etapa 12) =====
@@ -1795,9 +1831,15 @@
 
   function syncCustomEditorVisibility() {
     if (!els.customEditorPanel) return;
-    const show = state.roundMode === "personalizado";
+    const show = state.customModeEnabled;
     els.customEditorPanel.hidden = !show;
     if (show) els.customEditorPanel.open = true;
+  }
+
+  function syncDifficultyPicker() {
+    document.querySelectorAll(".diffBtn").forEach(btn => {
+      btn.classList.toggle("diffBtn--active", btn.dataset.difficulty === state.roundMode);
+    });
   }
 
   function pickChallenge() {
@@ -2056,41 +2098,60 @@
 
   function playSound(type) {
     if (!state.soundEnabled) return;
-
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (!AudioCtx) return;
-
       const ctx = new AudioCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
       const t0 = ctx.currentTime;
-      gain.gain.setValueAtTime(0.0001, t0);
-      gain.gain.exponentialRampToValueAtTime(0.12, t0 + 0.02);
+
+      const note = (freq, startT, dur, gainPeak = 0.15, oscType = "sine") => {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = oscType;
+        osc.frequency.setValueAtTime(freq, startT);
+        g.gain.setValueAtTime(0.0001, startT);
+        g.gain.exponentialRampToValueAtTime(gainPeak, startT + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, startT + dur);
+        osc.connect(g);
+        g.connect(ctx.destination);
+        osc.start(startT);
+        osc.stop(startT + dur + 0.05);
+        return osc;
+      };
 
       if (type === "spin") {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
         osc.type = "sawtooth";
         osc.frequency.setValueAtTime(220, t0);
-        osc.frequency.exponentialRampToValueAtTime(720, t0 + 0.25);
-        osc.frequency.exponentialRampToValueAtTime(260, t0 + 0.55);
-        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.6);
+        osc.frequency.exponentialRampToValueAtTime(880, t0 + 0.3);
+        osc.frequency.exponentialRampToValueAtTime(280, t0 + 0.65);
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.exponentialRampToValueAtTime(0.14, t0 + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.7);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
         osc.start(t0);
-        osc.stop(t0 + 0.62);
-      } else {
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(740, t0);
-        osc.frequency.exponentialRampToValueAtTime(520, t0 + 0.12);
-        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.18);
-        osc.start(t0);
-        osc.stop(t0 + 0.2);
+        osc.stop(t0 + 0.75);
+        osc.onended = () => ctx.close().catch(() => {});
+      } else if (type === "result") {
+        note(740, t0, 0.18, 0.12, "triangle");
+        note(520, t0 + 0.08, 0.15, 0.08, "triangle");
+        setTimeout(() => ctx.close().catch(() => {}), 400);
+      } else if (type === "eliminate") {
+        note(300, t0, 0.1, 0.18, "sawtooth");
+        note(200, t0 + 0.1, 0.2, 0.12, "sawtooth");
+        note(120, t0 + 0.28, 0.4, 0.08, "sine");
+        setTimeout(() => ctx.close().catch(() => {}), 900);
+      } else if (type === "win") {
+        // Fanfare
+        const fanfare = [[523, 0], [659, 0.1], [784, 0.2], [1047, 0.32], [784, 0.5], [1047, 0.62]];
+        fanfare.forEach(([freq, dt]) => note(freq, t0 + dt, 0.22, 0.13, "triangle"));
+        setTimeout(() => ctx.close().catch(() => {}), 1200);
+      } else if (type === "click") {
+        note(880, t0, 0.06, 0.06, "sine");
+        setTimeout(() => ctx.close().catch(() => {}), 200);
       }
-
-      osc.onended = () => {
-        ctx.close().catch(() => {});
-      };
     } catch {
       return;
     }
@@ -2142,7 +2203,7 @@
       time: isWheelOn("time") ? state.roundResult.time : null,
     });
 
-    playSound("result");
+    playSound(eliminated ? "eliminate" : "result");
     shakePlayer(playerId);
     renderAll();
 
@@ -2399,6 +2460,31 @@
           setRoundMode(mode);
         }
       });
+    });
+
+    // Difficulty picker buttons
+    document.querySelectorAll(".diffBtn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const mode = btn.dataset.difficulty || "normal";
+        if (mode === "proibidona") {
+          showModal18(state.roundMode);
+        } else {
+          setRoundMode(mode);
+        }
+      });
+    });
+
+    // Personalizado toggle
+    const customToggleBtn = document.getElementById("customModeToggleBtn");
+    customToggleBtn?.addEventListener("click", () => {
+      state.customModeEnabled = !state.customModeEnabled;
+      customToggleBtn.setAttribute("aria-pressed", state.customModeEnabled ? "true" : "false");
+      customToggleBtn.classList.toggle("toggle--on", state.customModeEnabled);
+      state.activeWheels.custom = state.customModeEnabled;
+      if (els.wheelCustom) els.wheelCustom.checked = state.customModeEnabled;
+      syncCustomEditorVisibility();
+      syncConfigDisabled();
+      renderRoundResult();
     });
 
     if (els.backToMenuBtn) {
