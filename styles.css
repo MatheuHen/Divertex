@@ -933,6 +933,9 @@ html[data-theme="darklove"] body {
 }
 
 /* ===== Modal ===== */
+.modal[hidden] {
+  display: none;
+}
 .modal {
   position: fixed;
   inset: 0;
