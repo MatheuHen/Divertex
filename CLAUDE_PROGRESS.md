@@ -2,30 +2,35 @@
 
 ## Projeto: Divertex — Roleta de Vidas
 
-### Status: BUILD VALIDADO — pronto para deploy
+### Status: PRODUÇÃO ATIVA ✅
 
 ---
 
 ## Estado atual (2026-05-28)
 
-- Build `npm run build` passou: ✅ 0 erros, 0 warnings, 773ms
-- `dist/` gerado com todos os assets (HTML + JS + CSS bundlados)
-- Vite atualizado para v6.4.2 (corrigiu vulnerabilidade esbuild)
-- Supabase: estrutura local 100% pronta, sem remote tocado
-- Vercel: `vercel.json` configurado, aguardando apenas variáveis e deploy real
+- Build `npm run build`: ✅ 0 erros, 0 warnings
+- Vite v6.4.2
+- **Deploy live:** https://divertex-kappa.vercel.app
+- **Supabase:** projeto remoto ativo, migration aplicada, env vars configuradas na Vercel
+- **Bug corrigido:** `[hidden]{display:none!important}` — overlays bloqueavam cliques
 
 ---
 
 ## Etapas do jogo: todas concluídas ✅
 
-Prompts 1–17 implementados (Supabase e Deploy incluídos localmente).
-Etapas 15 e 16 pendentes apenas na parte remota (requerem autorização).
+Prompts 1–17 implementados e em produção.
 
 ---
 
-## Supabase — local ✅ / remoto ⏳
+## Supabase — ✅ ATIVO
 
-### O que está pronto
+### Projeto remoto
+- **Região:** South America (São Paulo)
+- **URL:** `https://kqiucdydlybotnocowdu.supabase.co` (pública)
+- **Anon key:** configurada na Vercel como env var (não commitada)
+- **Migration 001:** aplicada via SQL Editor
+
+### O que está ativo
 | Arquivo | Conteúdo |
 |---------|----------|
 | `supabase/migrations/001_schema.sql` | 5 tabelas + ranking_global VIEW + RLS + triggers + RPC |
@@ -42,35 +47,33 @@ Etapas 15 e 16 pendentes apenas na parte remota (requerem autorização).
 - Service role key nunca no front-end
 - Ranking expõe somente display_name, avatar, stats (sem e-mail)
 - `.env.local` no `.gitignore` — chaves reais nunca commitadas
+- Env vars salvas apenas na Vercel (não no repo)
 
-### Pendente (requer sua autorização)
-1. Criar projeto no Supabase (supabase.com, free tier)
-2. Rodar migration: Dashboard > SQL Editor > colar `001_schema.sql`
-3. Ativar Google OAuth em Authentication > Providers (opcional)
-4. Copiar URL + anon key para `.env.local`
+### Pendente (opcional)
+- Ativar Google OAuth em Authentication > Providers
 
 ---
 
-## Vercel — config pronta ✅ / deploy real ⏳
+## Vercel — ✅ ATIVO
 
-### O que está pronto
+### Projeto
+- **URL:** https://divertex-kappa.vercel.app
+- **GitHub:** https://github.com/MatheuHen/Divertex
+- **Plano:** Hobby (gratuito)
+- **Auto-deploy:** sim — cada push em `main` dispara redeploy
+
+### Env vars configuradas (via Vercel CLI, não commitadas)
+- `VITE_SUPABASE_URL` ✅
+- `VITE_SUPABASE_ANON_KEY` ✅
+
+### Arquivos
 | Arquivo | Conteúdo |
 |---------|----------|
 | `vercel.json` | buildCommand: `npm run build`, outputDirectory: `dist` |
-| `package.json` | vite@^6.3.5 + @supabase/supabase-js@^2.39.3 |
+| `package.json` | vite@^6.4.2 + @supabase/supabase-js@^2.39.3 |
 | `vite.config.js` | root: `.`, outDir: `dist` |
 | `.env.example` | Template com placeholders |
 | `.gitignore` | Exclui node_modules/, dist/, .env* |
-| `dist/` | Build gerado, 0 erros |
-
-### Para fazer o deploy (requer sua autorização)
-1. `git init && git add . && git commit -m "Divertex v1"`
-2. Subir no GitHub
-3. Importar na Vercel (vercel.com/new) — plano Hobby gratuito
-4. Em Project Settings > Environment Variables, adicionar:
-   - `VITE_SUPABASE_URL` = URL do seu projeto Supabase
-   - `VITE_SUPABASE_ANON_KEY` = anon key pública
-5. Clicar Deploy — sem plano pago, sem billing
 
 ---
 
@@ -78,7 +81,7 @@ Etapas 15 e 16 pendentes apenas na parte remota (requerem autorização).
 
 ```bash
 cp .env.example .env.local
-# Preencha VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY
+# Preencha VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY (ver Vercel dashboard)
 npm install
 npm run dev        # http://localhost:5173
 ```
