@@ -8,88 +8,89 @@
 
 ## Estado atual (2026-05-28)
 
-- Build `npm run build`: ✅ 0 erros, 0 warnings
-- Vite v6.4.2
 - **Deploy live:** https://divertex-kappa.vercel.app
-- **Supabase:** projeto remoto ativo, migration aplicada, env vars configuradas na Vercel
-- **Bug corrigido:** `[hidden]{display:none!important}` — overlays bloqueavam cliques
+- **GitHub:** https://github.com/MatheuHen/Divertex
+- **Supabase:** projeto ativo em São Paulo, migration aplicada
+- **Auth:** e-mail + senha com confirmação de e-mail ativo
+- **Google OAuth:** removido da UI por ora (provider não configurado no Supabase)
 
 ---
 
-## Etapas do jogo: todas concluídas ✅
+## Bugs corrigidos em produção
 
-Prompts 1–17 implementados e em produção.
+| Bug | Causa | Fix |
+|-----|-------|-----|
+| Clique em "Jogar agora" bloqueado | `.modal{display:flex}` sobrescreve `[hidden]` | `[hidden]{display:none!important}` global |
+| Ranking não aparecia para visitantes | `renderGlobalRanking()` só rodava pós-login | Chamada adicionada no `init()` |
+| Erros do Supabase em inglês | `error.message` raw do SDK | Mapa de tradução pt-BR em `auth-service.js` |
+| Botão Google chamava provider desativado | `signInWithGoogle()` sem Supabase configurado | Botão e handler removidos da UI |
+
+---
+
+## Testes ao vivo (Playwright contra produção)
+
+| Funcionalidade | Status | Observação |
+|----------------|--------|------------|
+| Menu inicial | ✅ | Sem erros de console |
+| Supabase conectado | ✅ | `GET /rest/v1/ranking_global` dispara no load |
+| Ranking global | ✅ | Carrega sem login; mostra "Nenhum dado ainda." (banco vazio) |
+| Modal login | ✅ | Sem botão Google, limpo |
+| Validação campos vazios | ✅ | "Preencha e-mail e senha." |
+| Login credenciais erradas | ✅ | "E-mail ou senha incorretos." (pt-BR) |
+| E-mail inválido | ✅ | "Formato de e-mail inválido." |
+| Senha curta | ✅ | "A senha deve ter pelo menos 6 caracteres." |
+| Cadastro com e-mail real | ✅ | "Conta criada! Verifique seu e-mail para ativar." |
+| Fechar modal (X / fora) | ✅ | Modal removido do DOM |
+| Salvar partida sem login | ✅ | Alert "Faça login para salvar a partida." |
+| 5 temas visuais | ✅ | neon, darklove, caos, casal, minimal |
+| 11 modos de jogo | ✅ | normal, tempo, desafio, leve, médio, difícil… |
+| Roleta com 4 jogadores | ✅ | Anima, card de resultado correto |
+| Mobile 390px | ✅ | Layout responsivo |
+| Perfil pós-login | ⚠️ | Requer conta confirmada; código pronto |
+| Amizades | ⚠️ | Serviço pronto (`js/friends-service.js`), sem UI frontend ainda |
+| Salvamento de sessão (logado) | ⚠️ | Requer conta confirmada; código pronto |
 
 ---
 
 ## Supabase — ✅ ATIVO
 
-### Projeto remoto
+### Projeto
 - **Região:** South America (São Paulo)
-- **URL:** `https://kqiucdydlybotnocowdu.supabase.co` (pública)
-- **Anon key:** configurada na Vercel como env var (não commitada)
-- **Migration 001:** aplicada via SQL Editor
+- **URL:** `https://kqiucdydlybotnocowdu.supabase.co`
+- **Migration 001:** aplicada (5 tabelas + VIEW + RLS + triggers + RPC)
+- **Confirmação de e-mail:** ativa (padrão do Supabase free tier)
 
-### O que está ativo
-| Arquivo | Conteúdo |
-|---------|----------|
-| `supabase/migrations/001_schema.sql` | 5 tabelas + ranking_global VIEW + RLS + triggers + RPC |
-| `js/supabase-client.js` | Cliente com graceful degradation (null se sem config) |
-| `js/auth-service.js` | signUp, signIn, Google OAuth, signOut, getProfile, updateProfile |
-| `js/game-service.js` | saveSession, loadSession, saveRound, submitGameStats |
-| `js/ranking-service.js` | getGlobalRanking, getFriendsRanking, getMyStats |
-| `js/friends-service.js` | sendFriendRequest, respondFriendRequest, listFriends, searchUsers |
-| `js/supabase-integration.js` | Cola Supabase ao DivertexApp (hooks onRoundComplete, onWinner) |
-| `js/auth-ui.js` | Painel login/cadastro/Google, modal de auth |
-
-### Segurança / LGPD
-- 5 tabelas com RLS habilitado, 11 policies
-- Service role key nunca no front-end
-- Ranking expõe somente display_name, avatar, stats (sem e-mail)
-- `.env.local` no `.gitignore` — chaves reais nunca commitadas
-- Env vars salvas apenas na Vercel (não no repo)
-
-### Pendente (opcional)
-- Ativar Google OAuth em Authentication > Providers
+### Serviços implementados
+| Arquivo | Status |
+|---------|--------|
+| `js/supabase-client.js` | ✅ graceful degradation |
+| `js/auth-service.js` | ✅ signUp, signIn, signOut + traduções pt-BR |
+| `js/game-service.js` | ✅ saveSession, saveRound, submitGameStats |
+| `js/ranking-service.js` | ✅ getGlobalRanking, getFriendsRanking, getMyStats |
+| `js/friends-service.js` | ✅ backend pronto, sem UI |
+| `js/supabase-integration.js` | ✅ hooks onRoundComplete, onWinner, ranking no init |
+| `js/auth-ui.js` | ✅ modal login/cadastro, authBar logado/deslogado |
 
 ---
 
 ## Vercel — ✅ ATIVO
 
-### Projeto
 - **URL:** https://divertex-kappa.vercel.app
-- **GitHub:** https://github.com/MatheuHen/Divertex
 - **Plano:** Hobby (gratuito)
-- **Auto-deploy:** sim — cada push em `main` dispara redeploy
-
-### Env vars configuradas (via Vercel CLI, não commitadas)
-- `VITE_SUPABASE_URL` ✅
-- `VITE_SUPABASE_ANON_KEY` ✅
-
-### Arquivos
-| Arquivo | Conteúdo |
-|---------|----------|
-| `vercel.json` | buildCommand: `npm run build`, outputDirectory: `dist` |
-| `package.json` | vite@^6.4.2 + @supabase/supabase-js@^2.39.3 |
-| `vite.config.js` | root: `.`, outDir: `dist` |
-| `.env.example` | Template com placeholders |
-| `.gitignore` | Exclui node_modules/, dist/, .env* |
+- **Env vars:** `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` (via Vercel CLI, não commitadas)
+- **Auto-deploy:** cada push em `main` — note: usar `vercel --prod && vercel alias divertex-kappa-tawny.vercel.app divertex-kappa.vercel.app` para garantir env vars no bundle
 
 ---
 
-## Para rodar localmente com Supabase
+## Próximos passos opcionais
 
-```bash
-cp .env.example .env.local
-# Preencha VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY (ver Vercel dashboard)
-npm install
-npm run dev        # http://localhost:5173
-```
-
-Sem Supabase configurado, o jogo funciona normalmente em modo local (auth desativada silenciosamente).
+1. **UI de amizades** — tela para enviar/aceitar pedidos (backend pronto)
+2. **Google OAuth** — configurar Client ID/Secret no Google Cloud + Supabase
+3. **Testes pós-confirmação** — login, perfil, salvar sessão com conta real
 
 ---
 
 ## Regras da sessão
-- Não tocar em .env real, tokens, chaves, billing, contas, deploy remoto, Supabase remoto, migrations remotas, PATH, hooks globais
+- Não tocar em .env real, tokens, chaves, billing, accounts, PATH, hooks globais
 - Confirmar antes de --force, reset, clean, delete destrutivo
+- `signInWithGoogle` em `auth-service.js` mantido para uso futuro
