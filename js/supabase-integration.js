@@ -26,6 +26,9 @@ async function init() {
 
   renderAuthPanel(null);
 
+  // Carrega ranking público na inicialização (não requer login)
+  renderGlobalRanking();
+
   // Ouve mudanças de auth
   onAuthStateChange(async (session) => {
     currentSession = session;
