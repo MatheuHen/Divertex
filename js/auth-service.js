@@ -54,7 +54,7 @@ export async function resetPassword({ email }) {
   if (!sb) return { error: 'Supabase não configurado.' };
 
   const { error } = await sb.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}#reset-password`,
+    redirectTo: window.location.origin,
   });
 
   if (error) return { error: translateError(error.message) };
