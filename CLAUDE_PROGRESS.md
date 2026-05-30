@@ -1,6 +1,6 @@
 # CLAUDE_PROGRESS.md — Divertex
 
-**Atualizado em:** 2026-05-29  
+**Atualizado em:** 2026-05-30  
 **Status geral:** PRODUÇÃO ATIVA ✅  
 **URL pública:** https://divertex-kappa.vercel.app  
 **GitHub:** https://github.com/MatheuHen/Divertex  
@@ -20,6 +20,9 @@
 | `.gitignore` | Exclui node_modules/, dist/, .env* | ✅ |
 | `.env.example` | Template público com placeholders | ✅ |
 | `supabase/migrations/001_schema.sql` | Schema completo: 5 tabelas + VIEW + RLS + triggers + RPC | ✅ |
+| `supabase/migrations/002_security_performance_hardening.sql` | View SECURITY INVOKER, REVOKE funções do anon, RLS com (select auth.uid()), split policy ALL | ✅ |
+| `supabase/migrations/003_fix_trigger_function_grants.sql` | Restaura EXECUTE para supabase_auth_admin nos triggers (fix login quebrado) | ✅ |
+| `supabase/migrations/004_fix_table_grants.sql` | GRANT DML completo para authenticated em todas as tabelas operacionais | ✅ |
 | `js/supabase-client.js` | Cria cliente com fallback hardcoded (chave pública anon) | ✅ |
 | `js/auth-service.js` | signUp, signIn, signOut, getSession, getProfile, onAuthStateChange + traduções pt-BR | ✅ |
 | `js/auth-ui.js` | Modal login/cadastro, authBar logado/deslogado | ✅ |
@@ -106,9 +109,12 @@ npx vercel alias divertex-kappa-tawny.vercel.app divertex-kappa.vercel.app
 |------|--------|
 | Projeto | Ativo (free tier, São Paulo) |
 | URL | `https://kqiucdydlybotnocowdu.supabase.co` (pública) |
-| Migration 001 | ✅ Aplicada via MCP (2026-05-29) — profiles, player_stats, friendships, game_sessions, session_rounds + VIEW ranking_global |
-| GRANTs | ✅ `GRANT SELECT ON ranking_global, profiles, player_stats TO anon, authenticated` — ranking funciona sem login |
-| RLS | Ativo em todas as 5 tabelas |
+| Migration 001 | ✅ Aplicada (2026-05-29) — profiles, player_stats, friendships, game_sessions, session_rounds + VIEW ranking_global |
+| Migration 002 | ✅ Aplicada (2026-05-30) — segurança e performance (ver seção 12) |
+| Migration 003 | ✅ Aplicada (2026-05-30) — fix grants de trigger functions (ver seção 12) |
+| Migration 004 | ✅ Aplicada (2026-05-30) — fix GRANTs DML para authenticated (ver seção 12) |
+| GRANTs | ✅ authenticated tem SELECT/INSERT/UPDATE/DELETE em todas as tabelas operacionais |
+| RLS | ✅ Ativo em todas as 5 tabelas com (select auth.uid()) para performance |
 | Confirmação de e-mail | Ativa (usuário precisa clicar no link para logar) |
 | Ranking global | ✅ Carrega para todos via VIEW pública LGPD-safe (sem e-mail) |
 
@@ -290,7 +296,53 @@ Sessão bateu o limite de tokens antes de concluir. O prompt completo foi escrit
 
 ## 11. Próximo passo exato
 
-**Todos os 3 minigames implementados.** ~~Sorteador de Letras~~ ✅ → ~~Sorteador de Números~~ ✅ → ~~Sorteador de Nomes~~ ✅ → **Próximo: deploy** (`npx vercel --prod` → alias).
+**Todos os 3 minigames implementados e banco corrigido.** Próximo: novas features ou melhorias.
+
+---
+
+## 12. Correções do banco — 2026-05-30
+
+Auditoria completa via Supabase MCP + teste Playwright com conta real. Todos os bugs encontrados foram corrigidos e commitados.
+
+### Migration 002 — Segurança e Performance
+
+| Item | Problema | Fix |
+|------|----------|-----|
+| `ranking_global` view | SECURITY DEFINER desnecessário (ERROR no advisor) | Recriada com `security_invoker = true` |
+| `handle_new_user`, `handle_new_profile`, `rls_auto_enable` | Chamáveis por `anon` via `/rest/v1/rpc/` | `REVOKE EXECUTE FROM PUBLIC` |
+| `increment_player_stats` | Chamável por `anon` (poderia manipular ranking) | `REVOKE FROM PUBLIC`, `GRANT TO authenticated` |
+| 8 políticas RLS com `auth.uid()` | Re-avaliado por linha (lento em escala) | Substituído por `(select auth.uid())` |
+| `player_stats` com 2 policies SELECT permissivas | `stats_read_any` + `stats_write_own` (ALL) sobrepostos | Split em `stats_insert_own`, `stats_update_own`, `stats_delete_own` |
+
+### Migration 003 — Fix de trigger functions (login quebrado)
+
+O `REVOKE FROM PUBLIC` da migration 002 removeu EXECUTE de `supabase_auth_admin` nos triggers de auth, quebrando o login com "Database error querying schema".
+
+| Função | Roles que precisam de EXECUTE |
+|--------|-------------------------------|
+| `handle_new_user` | `supabase_auth_admin`, `service_role`, `postgres` |
+| `handle_new_profile` | `supabase_auth_admin`, `authenticated`, `service_role`, `postgres` |
+| `rls_auto_enable` | `postgres` |
+
+### Migration 004 — GRANTs DML faltantes (bug pré-existente da migration 001)
+
+A migration 001 só concedeu SELECT em `profiles` e `player_stats`. Sem os GRANTs de tabela, o PostgreSQL rejeita com `permission denied` antes de checar o RLS — causando 403 no salvar sessão, amizades e rounds.
+
+| Tabela | Grants adicionados para `authenticated` |
+|--------|----------------------------------------|
+| `profiles` | INSERT, UPDATE |
+| `player_stats` | INSERT, UPDATE, DELETE |
+| `friendships` | SELECT, INSERT, UPDATE, DELETE |
+| `game_sessions` | SELECT, INSERT, UPDATE, DELETE |
+| `session_rounds` | SELECT, INSERT, UPDATE, DELETE |
+
+### Resultado do teste após correções
+
+13 features testadas com conta real (`teste2@divertex.com`), zero erros de console, sessão salva no banco confirmada via SQL.
+
+### Pendente (requer Dashboard Supabase)
+
+- Ativar proteção HaveIBeenPwned em Auth → Password → Leaked Password Protection
 
 ---
 
