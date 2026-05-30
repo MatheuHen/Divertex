@@ -82,28 +82,28 @@
             <button id="openLikelyBtn" class="btn btn--big" type="button">Jogar agora</button>
           </article>
 
-          <!-- Minigame 3: Verdade ou Caos (Em breve) -->
-          <article class="gameCard gameCard--soon">
-            <div class="gameCard__icon" aria-hidden="true">⚡</div>
-            <div class="gameCard__title">Verdade ou Caos <span class="badgeSoon">Em breve</span></div>
-            <div class="gameCard__desc">Perguntas diretas e escolhas perigosas. O grupo decide o destino de cada jogador.</div>
-            <button class="btn btn--big" type="button" disabled>Em desenvolvimento</button>
+          <!-- Minigame 3: Sorteador de Letras -->
+          <article class="gameCard gameCard--letters">
+            <div class="gameCard__icon" aria-hidden="true">🔤</div>
+            <div class="gameCard__title">Sorteador de Letras</div>
+            <div class="gameCard__desc">Letras sorteadas, timer correndo. Fale uma palavra com cada letra antes do tempo acabar. Falhou = perde vida. Último de pé vence.</div>
+            <button id="openLettersBtn" class="btn btn--big" type="button">Jogar agora</button>
           </article>
 
-          <!-- Minigame 4: Duelo de Coragem (Em breve) -->
-          <article class="gameCard gameCard--soon">
-            <div class="gameCard__icon" aria-hidden="true">⚔️</div>
-            <div class="gameCard__title">Duelo de Coragem <span class="badgeSoon">Em breve</span></div>
-            <div class="gameCard__desc">Dois jogadores sorteados se enfrentam em desafios 1v1. Só um sai vivo.</div>
-            <button class="btn btn--big" type="button" disabled>Em desenvolvimento</button>
+          <!-- Minigame 4: Sorteador de Números -->
+          <article class="gameCard gameCard--numbers">
+            <div class="gameCard__icon" aria-hidden="true">🎰</div>
+            <div class="gameCard__title">Sorteador de Números</div>
+            <div class="gameCard__desc">Sorteia números em qualquer faixa. Manual, automático ou tudo de uma vez. Sem repetição opcional. Perfeito para rifas e sorteios.</div>
+            <button id="openNumbersBtn" class="btn btn--big" type="button">Sortear agora</button>
           </article>
 
-          <!-- Minigame 5: Cartas do Caos (Em breve) -->
-          <article class="gameCard gameCard--soon">
-            <div class="gameCard__icon" aria-hidden="true">🃏</div>
-            <div class="gameCard__title">Cartas do Caos <span class="badgeSoon">Em breve</span></div>
-            <div class="gameCard__desc">Baralho aleatório que muda as regras a cada rodada. Zero previsibilidade.</div>
-            <button class="btn btn--big" type="button" disabled>Em desenvolvimento</button>
+          <!-- Minigame 5: Sorteador de Nomes -->
+          <article class="gameCard gameCard--names">
+            <div class="gameCard__icon" aria-hidden="true">🎯</div>
+            <div class="gameCard__title">Sorteador de Nomes</div>
+            <div class="gameCard__desc">Adicione os nomes, gire a roleta e descubra o sortudo. Para rifas, decisões difíceis ou escolher quem vai pagar a conta.</div>
+            <button id="openNamesBtn" class="btn btn--big" type="button">Girar agora</button>
           </article>
         </div>
       </div>
@@ -190,20 +190,6 @@
               </div>
             </details>
 
-            <details class="card details" open>
-              <summary class="details__summary">Brincadeiras (uma por linha)</summary>
-              <textarea
-                id="challengesInput"
-                class="textarea"
-                rows="7"
-                spellcheck="false"
-                placeholder="Ex.: Imitar um animal por 5s&#10;Ex.: Falar com sotaque até a próxima rodada"
-              ></textarea>
-              <div class="row">
-                <button id="updateChallengesBtn" class="btn btn--soft" type="button">Atualizar brincadeiras</button>
-                <button id="shuffleChallengesBtn" class="btn btn--ghost" type="button">Embaralhar</button>
-              </div>
-            </details>
           </section>
 
           <section class="stage">
@@ -314,6 +300,7 @@
                         <label class="check"><input id="wheelPenalty" type="checkbox" /><span>Penalidade</span></label>
                         <label class="check"><input id="wheelBonus" type="checkbox" /><span>Bônus</span></label>
                         <label class="check"><input id="wheelCustom" type="checkbox" /><span>Personalizada</span></label>
+                        <label class="check"><input id="wheelReward" type="checkbox" /><span>Recompensa</span></label>
                       </div>
                     </div>
                   </div>
@@ -385,6 +372,318 @@
     </section>
 
     <!-- Tela: Quem é Mais Provável -->
+    <!-- ════════════════ SORTEADOR DE NOMES ═══════════════ -->
+    <section id="screenNames" class="screen" aria-label="Sorteador de Nomes">
+      <div class="nw-app">
+        <header class="topbar">
+          <div class="brand">
+            <div class="brand__title">Sorteador de Nomes</div>
+            <div class="brand__subtitle">Divertex • Adicione os nomes. Gire. Descubra o sortudo.</div>
+          </div>
+          <div class="topbar__controls">
+            <button id="nwBackMenuBtn" class="btn btn--ghost" type="button">Voltar ao menu</button>
+          </div>
+        </header>
+
+        <div class="nw-layout">
+
+          <!-- Painel de nomes -->
+          <div class="card nw-names-panel">
+            <div class="panel__title">Participantes</div>
+            <form id="nwNameForm" autocomplete="off">
+              <div class="nw-form-row">
+                <input id="nwNameInput" class="input" type="text"
+                  placeholder="Nome ou vários separados por vírgula" maxlength="80" required />
+                <button class="btn" type="submit">+</button>
+              </div>
+            </form>
+            <div id="nwNamesList" class="nw-names-list"></div>
+            <button id="nwClearBtn" class="btn btn--ghost btn--sm nw-clear-btn" type="button">🗑 Limpar lista</button>
+          </div>
+
+          <!-- Roleta -->
+          <div class="nw-wheel-section">
+            <div class="nw-canvas-wrap">
+              <div class="nw-pointer" aria-hidden="true"></div>
+              <canvas id="nwCanvas"></canvas>
+
+              <!-- Resultado inline -->
+              <div id="nwResult" class="nw-result" hidden>
+                <div class="nw-result__label">Sorteado!</div>
+                <div id="nwResultName" class="nw-result__name"></div>
+                <div class="nw-result__actions">
+                  <button id="nwSpinAgainBtn" class="btn btn--big" type="button">🔄 Girar novamente</button>
+                  <button id="nwRemoveWinnerBtn" class="btn btn--ghost" type="button" data-winner-id="">Remover e girar</button>
+                </div>
+              </div>
+            </div>
+
+            <button id="nwSpinBtn" class="btn btn--big nw-spin-btn" type="button" disabled>🎯 Girar!</button>
+          </div>
+
+          <!-- Histórico -->
+          <div class="card nw-history-panel">
+            <div class="panel__title">Histórico</div>
+            <div id="nwHistory" class="nw-history"></div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════ SORTEADOR DE NÚMEROS ══════════════ -->
+    <section id="screenNumbers" class="screen" aria-label="Sorteador de Números">
+      <div class="ng-app">
+        <header class="topbar">
+          <div class="brand">
+            <div class="brand__title">Sorteador de Números</div>
+            <div class="brand__subtitle">Divertex • Rifas, sorteios, loteria.</div>
+          </div>
+          <div class="topbar__controls">
+            <button id="ngBackMenuBtn" class="btn btn--ghost" type="button">Voltar ao menu</button>
+          </div>
+        </header>
+
+        <div class="ng-layout">
+
+          <!-- Configuração -->
+          <div class="card ng-config-card">
+            <div class="panel__title">Configuração</div>
+
+            <div class="ng-presets">
+              <button class="ng-preset-btn" data-min="1" data-max="10" type="button">1-10</button>
+              <button class="ng-preset-btn ng-preset-btn--active" data-min="1" data-max="100" type="button">1-100</button>
+              <button class="ng-preset-btn" data-min="1" data-max="1000" type="button">1-1.000</button>
+              <button class="ng-preset-btn" data-min="1" data-max="10000" type="button">1-10.000</button>
+            </div>
+
+            <div class="ng-range-row">
+              <label class="field">
+                <span class="field__label">Mínimo</span>
+                <input id="ngMin" class="input" type="number" value="1" min="0" />
+              </label>
+              <div class="ng-range-sep">até</div>
+              <label class="field">
+                <span class="field__label">Máximo</span>
+                <input id="ngMax" class="input" type="number" value="100" min="1" />
+              </label>
+            </div>
+
+            <label class="field">
+              <span class="field__label">Quantidade <span class="ng-hint">(0 = ilimitado)</span></span>
+              <input id="ngQuantity" class="input" type="number" value="0" min="0" />
+            </label>
+
+            <label class="toggle">
+              <input id="ngNoRepeat" type="checkbox" checked />
+              <span class="toggle__ui"></span>
+              <span class="toggle__text">Sem repetição</span>
+            </label>
+
+            <label class="field">
+              <span class="field__label">Modo</span>
+              <select id="ngMode" class="input">
+                <option value="manual">🖱️ Manual (apertar botão)</option>
+                <option value="auto">⚡ Automático (intervalo)</option>
+                <option value="all">💥 Tudo de uma vez</option>
+              </select>
+            </label>
+
+            <label class="field" id="ngAutoIntervalField" style="display:none">
+              <span class="field__label">Intervalo automático (segundos)</span>
+              <input id="ngAutoInterval" class="input" type="number" value="3" min="1" max="30" />
+            </label>
+
+            <button id="ngResetBtn" class="btn btn--ghost" type="button">↺ Resetar</button>
+          </div>
+
+          <!-- Área principal -->
+          <div class="ng-main">
+
+            <!-- Display + controles -->
+            <div class="card ng-display-card">
+              <div class="ng-display-wrap">
+                <div id="ngDisplay" class="ng-display">?</div>
+                <div id="ngDrawnCount" class="ng-drawn-count"></div>
+              </div>
+
+              <div id="ngProgress" class="ng-progress-wrap" style="display:none">
+                <div class="ng-progress-track">
+                  <div class="ng-progress-bar" style="width:0%"></div>
+                </div>
+                <span class="ng-progress-text">0 / 0</span>
+              </div>
+
+              <div id="ngExhausted" class="ng-exhausted" style="display:none">
+                ✅ Todos os números foram sorteados!
+              </div>
+
+              <div id="ngManualControls" class="ng-controls">
+                <button id="ngDrawBtn" class="btn btn--big ng-draw-btn" type="button">🎲 Sortear</button>
+              </div>
+
+              <div id="ngAutoControls" class="ng-controls" style="display:none">
+                <button id="ngAutoStartBtn" class="btn btn--big ng-draw-btn" type="button">▶ Iniciar automático</button>
+                <button id="ngAutoStopBtn" class="btn btn--danger" type="button" style="display:none">⏹ Parar</button>
+              </div>
+
+              <div id="ngAllControls" class="ng-controls" style="display:none">
+                <button id="ngDrawAllBtn" class="btn btn--big ng-draw-btn" type="button">💥 Sortear tudo</button>
+              </div>
+            </div>
+
+            <!-- Histórico -->
+            <div class="card ng-history-card">
+              <div class="ng-history-header">
+                <div class="panel__title">Histórico</div>
+                <button id="ngCopyBtn" class="btn btn--ghost btn--sm" type="button" disabled>📋 Copiar todos</button>
+              </div>
+              <div id="ngHistoryGrid" class="ng-history-grid">
+                <div class="ng-history-empty">Nenhum número sorteado ainda</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════ SORTEADOR DE LETRAS ═══════════════ -->
+    <section id="screenLetters" class="screen" aria-label="Sorteador de Letras">
+      <div class="lg-app">
+        <header class="topbar">
+          <div class="brand">
+            <div class="brand__title">Sorteador de Letras</div>
+            <div class="brand__subtitle">Divertex • Sorteia. Timer. Fale. Sobreviva.</div>
+          </div>
+          <div class="topbar__controls">
+            <button id="lgBackMenuBtn" class="btn btn--ghost" type="button">Voltar ao menu</button>
+          </div>
+        </header>
+
+        <!-- Fase: Setup -->
+        <div id="lgSetup" class="lg-phase">
+          <div class="lg-setup-grid">
+            <div class="card lg-setup-left">
+              <div class="panel__title">Jogadores</div>
+              <form id="lgPlayerForm" autocomplete="off">
+                <div class="lg-form-row">
+                  <input id="lgNameInput" class="input" type="text" placeholder="Nome do jogador" maxlength="20" required />
+                  <button class="btn" type="submit">Adicionar</button>
+                </div>
+              </form>
+              <div id="lgPlayersList" class="lg-chips-list"></div>
+              <p class="lg-player-info">Cada jogador começa com <strong>3 ❤️</strong>. Não conseguiu = perde 1 vida. 0 vidas = eliminado.</p>
+            </div>
+            <div class="card lg-setup-right">
+              <div class="panel__title">Configuração</div>
+              <label class="field">
+                <span class="field__label">Letras por turno</span>
+                <input id="lgLettersCount" class="input" type="number" min="1" max="10" value="3" />
+              </label>
+              <label class="field">
+                <span class="field__label">Modo</span>
+                <select id="lgMode" class="input">
+                  <option value="sequential">⏩ Sequencial (uma letra por vez)</option>
+                  <option value="simultaneous">🔀 Simultâneo (todas de uma vez)</option>
+                </select>
+              </label>
+              <label class="field">
+                <span class="field__label">Tempo por letra (segundos)</span>
+                <input id="lgTimePerLetter" class="input" type="number" min="5" max="60" value="15" />
+              </label>
+              <label class="field">
+                <span class="field__label">Categoria</span>
+                <select id="lgCategory" class="input">
+                  <option value="livre">Qualquer palavra</option>
+                  <option value="animal">Nome de animal</option>
+                  <option value="frase">Frase completa</option>
+                  <option value="nome">Nome de pessoa</option>
+                  <option value="cidade">Nome de cidade</option>
+                </select>
+              </label>
+              <label class="toggle" style="margin-bottom:16px">
+                <input id="lgBonusToggle" type="checkbox" checked />
+                <span class="toggle__ui"></span>
+                <span class="toggle__text">Bônus ao conseguir (+1 vida)</span>
+              </label>
+              <div class="lg-setup-rules">
+                <div class="lg-rule-item">🔤 N letras sorteadas por turno</div>
+                <div class="lg-rule-item">⏱️ Timer countdown por letra</div>
+                <div class="lg-rule-item">❤️ Não conseguiu = perde 1 vida</div>
+                <div class="lg-rule-item">🌟 Conseguiu = +1 vida (se bônus ON)</div>
+                <div class="lg-rule-item">💀 0 vidas = eliminado</div>
+                <div class="lg-rule-item">🏆 Último de pé vence</div>
+              </div>
+              <button id="lgStartBtn" class="btn btn--big" type="button" disabled>Começar jogo</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fase: Turno -->
+        <div id="lgTurn" class="lg-phase" hidden>
+          <div class="lg-turn-wrap">
+            <div class="card lg-turn-card">
+              <div class="lg-turn-header">
+                <div class="lg-turn-player-info">
+                  <div class="lg-turn-label">Vez de</div>
+                  <div class="lg-turn-player" id="lgTurnPlayer"></div>
+                  <div class="lg-turn-lives" id="lgTurnLives"></div>
+                </div>
+                <div class="lg-turn-meta">
+                  <span class="lg-meta-pill" id="lgTurnCategory"></span>
+                  <span class="lg-meta-pill" id="lgTurnMode"></span>
+                </div>
+              </div>
+
+              <div id="lgLettersDisplay" class="lg-letters-display"></div>
+
+              <div id="lgTimerDisplay" class="lg-timer-wrap">
+                <svg class="lg-timer-svg" viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
+                  <circle cx="32" cy="32" r="28" class="lg-timer-track"/>
+                  <circle id="lgTimerRing" cx="32" cy="32" r="28" class="lg-timer-ring"
+                    style="stroke-dasharray:175.93;stroke-dashoffset:0;transform:rotate(-90deg);transform-origin:32px 32px"/>
+                </svg>
+                <span id="lgTimerValue" class="lg-timer-value">15</span>
+              </div>
+
+              <div id="lgLetterActions" class="lg-actions">
+                <button id="lgSuccessBtn" class="btn lg-btn-success" type="button">✓ Conseguiu</button>
+                <button id="lgFailBtn" class="btn lg-btn-fail" type="button">✗ Não conseguiu</button>
+              </div>
+
+              <div id="lgSimActions" class="lg-actions" style="display:none">
+                <button id="lgSimSuccessBtn" class="btn lg-btn-success" type="button">✓ Falou todas</button>
+                <button id="lgSimFailBtn" class="btn lg-btn-fail" type="button">✗ Não conseguiu</button>
+              </div>
+            </div>
+
+            <div class="card lg-scoreboard-card">
+              <div class="panel__title">Placar</div>
+              <div id="lgScoreBoard" class="lg-scoreboard"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fase: Final -->
+        <div id="lgFinal" class="lg-phase" hidden>
+          <div class="lg-final-wrap">
+            <div class="card lg-final-card">
+              <div class="lg-final-trophy">🏆</div>
+              <div class="lg-final-label">Campeão das letras!</div>
+              <div class="lg-final-winner" id="lgFinalWinner"></div>
+              <div class="lg-final-sub">O último sobrevivente das letras</div>
+              <div id="lgFinalScores" class="lg-final-scores"></div>
+              <div class="lg-final-actions">
+                <button id="lgPlayAgainBtn" class="btn btn--big" type="button">Jogar novamente</button>
+                <button id="lgBackMenuFinalBtn" class="btn btn--ghost" type="button">Voltar ao menu</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section id="screenLikely" class="screen" aria-label="Quem é Mais Provável">
       <div class="lk-app">
         <header class="topbar">
@@ -500,6 +799,41 @@
       </div>
     </div>
 
+    <!-- Modal Roleta de Recompensas -->
+    <div id="rewardModal" class="modal reward-modal" hidden role="dialog" aria-modal="true" aria-label="Roleta de Recompensas">
+      <div class="modal__box reward-modal__box">
+        <div class="reward-modal__header">
+          <div class="reward-modal__title">🎰 Roleta de Recompensas</div>
+          <div class="reward-modal__sub">Girando…</div>
+        </div>
+        <div class="reward-modal__canvas-wrap">
+          <canvas id="rewardCanvas" width="300" height="300"></canvas>
+          <div class="reward-pointer" aria-hidden="true"></div>
+        </div>
+        <div id="rewardResult" class="reward-result" hidden></div>
+        <div class="reward-modal__actions">
+          <button id="rewardSpinBtn" class="btn btn--big" type="button">Girar!</button>
+          <button id="rewardCloseBtn" class="btn btn--ghost" type="button" hidden>Continuar</button>
+        </div>
+        <div class="reward-modal__footer">
+          <button id="rewardEditBtn" class="btn btn--ghost btn--sm" type="button">✏️ Editar recompensas</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Editar Recompensas -->
+    <div id="rewardEditModal" class="modal" hidden role="dialog" aria-modal="true">
+      <div class="modal__box">
+        <div class="modal__title">✏️ Editar Recompensas</div>
+        <div class="modal__body" style="font-size:13px;color:var(--muted);margin-bottom:12px">Uma recompensa por linha. Use "+N vida" para adicionar vidas (ex: "+1 vida").</div>
+        <textarea id="rewardItemsInput" class="textarea" rows="8" spellcheck="false"></textarea>
+        <div class="modal__actions">
+          <button id="rewardSaveBtn" class="btn btn--big" type="button">Salvar</button>
+          <button id="rewardEditCancelBtn" class="btn btn--ghost" type="button">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Overlay de vitória -->
     <div id="victoryOverlay" class="victoryOverlay" hidden>
       <div class="victoryOverlay__content">
@@ -510,8 +844,14 @@
       </div>
     </div>
 
+    <!-- Toast notifications -->
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
     <script type="module" src="./app.js"></script>
     <script type="module" src="./js/supabase-integration.js"></script>
     <script type="module" src="./js/likely-game.js"></script>
+    <script type="module" src="./js/letters-game.js"></script>
+    <script type="module" src="./js/numbers-game.js"></script>
+    <script type="module" src="./js/names-wheel.js"></script>
   </body>
 </html>

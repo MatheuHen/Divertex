@@ -131,6 +131,7 @@ export function updateAuthPanel(data) {
     <div class="authBar authBar--user">
       ${avatar}
       <span class="authBar__name">Olá, ${escHtml(name)}!</span>
+      <button id="friendsOpenBtn" class="btn btn--soft btn--sm">👥 Amigos</button>
       <button id="authSignOutBtn" class="btn btn--ghost btn--sm">Sair</button>
     </div>
   `;

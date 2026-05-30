@@ -1,4 +1,5 @@
 // js/likely-game.js — "Quem é Mais Provável" minigame
+import { submitGameStats } from './game-service.js';
 
 const QUESTIONS = [
   // Cotidiano
@@ -132,12 +133,40 @@ const FUNNY_MSGS = [
     const list = $('likelyPlayersList');
     if (!list) return;
     list.innerHTML = state.players.map((p, i) => `
-      <div class="lk-chip">
-        <span class="lk-chip__name">${p.name}</span>
+      <div class="lk-chip${p.isMe ? ' lk-chip--me' : ''}">
+        <span class="lk-chip__name">${p.name}${p.isMe ? ' <span class="lk-chip__you">você</span>' : ''}</span>
         <button class="lk-chip__remove" data-i="${i}" aria-label="Remover ${p.name}">✕</button>
       </div>`).join('');
     const startBtn = $('likelyStartBtn');
     if (startBtn) startBtn.disabled = state.players.length < 2;
+
+    // Mostra banner de perfil se logado
+    _renderUserBanner();
+  }
+
+  function _renderUserBanner() {
+    let banner = $('likelyUserBanner');
+    const user = window.DivertexUser;
+    if (!user) { banner?.remove(); return; }
+
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'likelyUserBanner';
+      banner.className = 'lk-user-banner';
+      $('likelyPlayerForm')?.insertAdjacentElement('afterend', banner);
+    }
+    const alreadyAdded = state.players.some(p => p.isMe);
+    banner.innerHTML = alreadyAdded
+      ? `<span class="lk-user-banner__name">Jogando como <strong>${user.name}</strong> ✓</span>`
+      : `<span class="lk-user-banner__name">Logado como <strong>${user.name}</strong></span>
+         <button id="likelyAddMeBtn" class="btn btn--soft btn--sm">+ Entrar no jogo</button>`;
+    if (!alreadyAdded) {
+      banner.querySelector('#likelyAddMeBtn')?.addEventListener('click', () => {
+        if (state.players.length >= 8) return;
+        state.players.push({ name: user.name, lives: LIVES, eliminated: false, isMe: true });
+        renderSetup();
+      });
+    }
   }
 
   $('likelyPlayerForm')?.addEventListener('submit', e => {
@@ -336,6 +365,26 @@ const FUNNY_MSGS = [
     }
 
     showPhase('final');
+
+    // Submete stats do usuário logado ao ranking
+    const user = window.DivertexUser;
+    if (user) {
+      const myPlayer = state.players.find(p => p.isMe);
+      if (myPlayer) {
+        const isWinner = !myPlayer.eliminated && myPlayer === winner;
+        const livesLost = LIVES - myPlayer.lives;
+        const score = isWinner
+          ? 120 + state.round * 8
+          : Math.max(0, state.round * 4 - livesLost * 5);
+        submitGameStats({
+          wins: isWinner ? 1 : 0,
+          rounds: state.round,
+          livesLost,
+          streak: state.round,
+          scoreDelta: score,
+        }).catch(() => {});
+      }
+    }
   }
 
   $('likelyPlayAgainBtn')?.addEventListener('click', () => {
@@ -355,6 +404,13 @@ const FUNNY_MSGS = [
     const screen = $('screenLikely');
     screen.classList.add('screen--active');
     state = { phase: 'setup', players: [], round: 0, totalRounds: 5, questionQueue: [], currentQuestion: '', votes: {} };
+
+    // Auto-adiciona o usuário logado
+    const user = window.DivertexUser;
+    if (user?.name) {
+      state.players.push({ name: user.name, lives: LIVES, eliminated: false, isMe: true });
+    }
+
     renderSetup();
     showPhase('setup');
   });

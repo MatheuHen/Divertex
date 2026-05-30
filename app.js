@@ -62,9 +62,18 @@
     countdownValue: $("#countdownValue"),
     ringProgress: $("#ringProgress"),
     endTurnBtn: $("#endTurnBtn"),
-    challengesInput: $("#challengesInput"),
-    updateChallengesBtn: $("#updateChallengesBtn"),
-    shuffleChallengesBtn: $("#shuffleChallengesBtn"),
+    wheelReward: $("#wheelReward"),
+    rewardModal: $("#rewardModal"),
+    rewardCanvas: $("#rewardCanvas"),
+    rewardSpinBtn: $("#rewardSpinBtn"),
+    rewardCloseBtn: $("#rewardCloseBtn"),
+    rewardResult: $("#rewardResult"),
+    rewardEditBtn: $("#rewardEditBtn"),
+    rewardEditModal: $("#rewardEditModal"),
+    rewardItemsInput: $("#rewardItemsInput"),
+    rewardSaveBtn: $("#rewardSaveBtn"),
+    rewardEditCancelBtn: $("#rewardEditCancelBtn"),
+    toastContainer: $("#toastContainer"),
   };
 
   // Mensagens para deixar a punição mais "Divertex"
@@ -1261,6 +1270,7 @@
     els.wheelPenalty.checked = isWheelOn("penalty");
     els.wheelBonus.checked = isWheelOn("bonus");
     els.wheelCustom.checked = isWheelOn("custom");
+    if (els.wheelReward) els.wheelReward.checked = isWheelOn("reward");
   }
 
   function syncConfigDisabled() {
@@ -1401,6 +1411,12 @@
         renderWheel();
         updateControls();
       });
+    }
+
+    // Update URL hash for browser history / back button
+    const newHash = _hashForScreen(name);
+    if (window.location.hash.slice(1) !== newHash) {
+      history.pushState(null, "", newHash ? `#${newHash}` : location.pathname + location.search);
     }
   }
 
@@ -1567,8 +1583,17 @@
         question: state.roundResult.question,
       });
     }
-    clearPendingAction();
-    updateControls();
+
+    // If reward wheel is active, spin it before clearing
+    if (isWheelOn("reward") && state.pendingAction?.playerId) {
+      const pid = state.pendingAction.playerId;
+      clearPendingAction();
+      updateControls();
+      showRewardSpinModal(pid, () => {});
+    } else {
+      clearPendingAction();
+      updateControls();
+    }
   }
 
   // ===== Manuais (Etapa 11) =====
@@ -1853,11 +1878,14 @@
     const cleanLives = clamp(Number(lives) || 0, 1, 20);
     if (!cleanName) return;
 
+    const user = window.DivertexUser;
+    const isMe = user?.name && cleanName === user.name;
     state.players.push({
       id: randomId(),
       name: cleanName,
       lives: cleanLives,
       maxLives: cleanLives,
+      isMe: Boolean(isMe),
     });
 
     els.nameInput.value = "";
@@ -1926,7 +1954,13 @@
 
       const name = document.createElement("div");
       name.className = "player__name";
-      name.textContent = p.name;
+      const user = window.DivertexUser;
+      const isMe = p.isMe || (user?.name && p.name === user.name);
+      if (isMe) {
+        name.innerHTML = `${p.name} <span class="player__you">você</span>`;
+      } else {
+        name.textContent = p.name;
+      }
 
       const meta = document.createElement("div");
       meta.className = "player__meta";
@@ -2420,6 +2454,7 @@
       penalty: false,
       bonus: false,
       custom: false,
+      reward: false,
     };
     clearRoundResult();
     setRoundMode("normal");
@@ -2527,6 +2562,7 @@
       state.activeWheels.penalty = Boolean(els.wheelPenalty?.checked);
       state.activeWheels.bonus = Boolean(els.wheelBonus?.checked);
       state.activeWheels.custom = Boolean(els.wheelCustom?.checked);
+      state.activeWheels.reward = Boolean(els.wheelReward?.checked);
       syncConfigDisabled();
       renderRoundResult();
     }
@@ -2541,6 +2577,7 @@
       els.wheelPenalty,
       els.wheelBonus,
       els.wheelCustom,
+      els.wheelReward,
     ].forEach((el) => el && el.addEventListener("change", onWheelChange));
 
     els.timerSecondsInput.addEventListener("change", (ev) => setTimerSeconds(ev.target.value));
@@ -2554,16 +2591,6 @@
       state.awaitingAction = true;
       state.pendingAction = { playerId: pid, spinId };
       updateControls();
-    });
-
-    els.updateChallengesBtn.addEventListener("click", () => {
-      const next = parseChallenges(els.challengesInput.value);
-      state.challenges = next.length ? next : [];
-      setResult({
-        name: els.resultName.textContent,
-        message: next.length ? `Brincadeiras atualizadas! (${next.length})` : "Brincadeiras limpas. (sem desafios)",
-        challenge: null,
-      });
     });
 
     if (els.cumpriumBtn) els.cumpriumBtn.addEventListener("click", () => closePendingClean());
@@ -2590,14 +2617,35 @@
       saveCustomContent();
     });
 
-    els.shuffleChallengesBtn.addEventListener("click", () => {
-      shuffleInPlace(state.challenges);
-      els.challengesInput.value = state.challenges.join("\n");
-      setResult({
-        name: els.resultName.textContent,
-        message: state.challenges.length ? "Brincadeiras embaralhadas!" : "Sem brincadeiras para embaralhar.",
-        challenge: null,
+    // Reward editor
+    if (els.rewardEditBtn) {
+      els.rewardEditBtn.addEventListener("click", () => {
+        if (els.rewardItemsInput) els.rewardItemsInput.value = rewardItems.join("\n");
+        if (els.rewardEditModal) els.rewardEditModal.hidden = false;
       });
+    }
+    if (els.rewardSaveBtn) {
+      els.rewardSaveBtn.addEventListener("click", () => {
+        const lines = (els.rewardItemsInput?.value || "").split("\n").map(s => s.trim()).filter(Boolean);
+        rewardItems = lines.length ? lines : [...DEFAULT_REWARD_ITEMS];
+        saveRewardItems(rewardItems);
+        if (els.rewardEditModal) els.rewardEditModal.hidden = true;
+        toast(`Recompensas salvas! (${rewardItems.length} itens)`, "success");
+      });
+    }
+    if (els.rewardEditCancelBtn) {
+      els.rewardEditCancelBtn.addEventListener("click", () => {
+        if (els.rewardEditModal) els.rewardEditModal.hidden = true;
+      });
+    }
+    if (els.rewardEditModal) {
+      els.rewardEditModal.addEventListener("click", e => { if (e.target === els.rewardEditModal) els.rewardEditModal.hidden = true; });
+    }
+
+    // Hash routing — back button support
+    window.addEventListener("popstate", () => {
+      const hash = window.location.hash.slice(1);
+      showScreen(_screenForHash(hash));
     });
 
     const ro = new ResizeObserver(() => renderWheel());
@@ -2620,9 +2668,215 @@
     });
   }
 
+  // ===== Toast system =====
+  function toast(msg, type = "info", duration = 3500) {
+    const container = els.toastContainer;
+    if (!container) return;
+    const el = document.createElement("div");
+    el.className = `toast toast--${type}`;
+    el.textContent = msg;
+    container.appendChild(el);
+    requestAnimationFrame(() => el.classList.add("toast--show"));
+    setTimeout(() => {
+      el.classList.remove("toast--show");
+      el.addEventListener("transitionend", () => el.remove(), { once: true });
+    }, duration);
+  }
+
+  // ===== Add life to player =====
+  function incLife(id, amount = 1) {
+    const p = state.players.find(x => x.id === id);
+    if (!p) return;
+    p.lives = Math.min(p.lives + amount, p.maxLives + 5);
+    p.maxLives = Math.max(p.maxLives, p.lives);
+    renderAll();
+  }
+
+  // ===== Reward items (localStorage) =====
+  const LS_REWARD_KEY = "divertex_rewards";
+  const DEFAULT_REWARD_ITEMS = [
+    "+1 vida",
+    "Imunidade na próxima rodada",
+    "Escolha quem será sorteado",
+    "Troque vidas com alguém",
+    "+2 vidas",
+    "Pule a próxima penalidade",
+    "Roube 1 vida de alguém",
+    "Escolha o próximo desafio",
+  ];
+
+  function loadRewardItems() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(LS_REWARD_KEY) || "null");
+      return Array.isArray(saved) && saved.length ? saved : [...DEFAULT_REWARD_ITEMS];
+    } catch { return [...DEFAULT_REWARD_ITEMS]; }
+  }
+
+  function saveRewardItems(items) {
+    try { localStorage.setItem(LS_REWARD_KEY, JSON.stringify(items)); } catch {}
+  }
+
+  let rewardItems = loadRewardItems();
+
+  // ===== Reward wheel mini canvas =====
+  function drawRewardWheel(canvas, items, angle) {
+    const ctx = canvas.getContext("2d");
+    const w = canvas.width, h = canvas.height;
+    const cx = w / 2, cy = h / 2;
+    const r = Math.min(w, h) * 0.44;
+    const n = items.length;
+    const slice = (Math.PI * 2) / n;
+    const colors = ["#22e6ff","#ff3df2","#4ade80","#f59e0b","#a855f7","#fb4d89","#60a5fa","#ff6b35"];
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    for (let i = 0; i < n; i++) {
+      const a0 = angle + i * slice;
+      const a1 = a0 + slice;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, r, a0, a1);
+      ctx.closePath();
+      ctx.fillStyle = colors[i % colors.length];
+      ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.25)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      const mid = a0 + slice / 2;
+      ctx.save();
+      ctx.rotate(mid);
+      ctx.translate(r * 0.6, 0);
+      ctx.rotate(Math.PI / 2);
+      ctx.fillStyle = "rgba(0,0,0,0.8)";
+      ctx.font = `bold ${Math.max(10, Math.floor(r * 0.09))}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const label = items[i].length > 18 ? items[i].slice(0, 16) + "…" : items[i];
+      ctx.fillText(label, 0, 0, r * 0.7);
+      ctx.restore();
+    }
+
+    // Center hub
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.12, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function showRewardSpinModal(playerId, onDone) {
+    const modal = els.rewardModal;
+    const canvas = els.rewardCanvas;
+    if (!modal || !canvas) { onDone?.(); return; }
+
+    const items = rewardItems.length ? rewardItems : DEFAULT_REWARD_ITEMS;
+    let angle = 0;
+    let spinning = false;
+    let _spinDone = false;
+
+    const spinBtn = modal.querySelector("#rewardSpinBtn");
+    const closeBtn = modal.querySelector("#rewardCloseBtn");
+    const resultEl = modal.querySelector("#rewardResult");
+    const sub = modal.querySelector(".reward-modal__sub");
+
+    drawRewardWheel(canvas, items, angle);
+    if (sub) sub.textContent = "Clique em Girar para descobrir sua recompensa!";
+    if (resultEl) resultEl.hidden = true;
+    if (spinBtn) { spinBtn.hidden = false; spinBtn.disabled = false; }
+    if (closeBtn) closeBtn.hidden = true;
+    modal.hidden = false;
+
+    function onSpin() {
+      if (spinning) return;
+      spinning = true;
+      if (spinBtn) spinBtn.disabled = true;
+      playSound("spin");
+      if (sub) sub.textContent = "Girando…";
+
+      const n = items.length;
+      const slice = (Math.PI * 2) / n;
+      const selectedIndex = Math.floor(Math.random() * n);
+      const pointer = -Math.PI / 2;
+      const centerRel = selectedIndex * slice + slice / 2;
+      const target = pointer - centerRel;
+      const spins = 5 + Math.floor(Math.random() * 3);
+      const delta = ((target - angle) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) + spins * Math.PI * 2;
+      const startAngle = angle;
+      const endAngle = startAngle + delta;
+      const duration = 3000 + Math.random() * 500;
+      const startT = performance.now();
+
+      function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+
+      function frame() {
+        const elapsed = performance.now() - startT;
+        const t = Math.min(elapsed / duration, 1);
+        angle = startAngle + delta * easeOut(t);
+        drawRewardWheel(canvas, items, angle);
+        if (t < 1) { requestAnimationFrame(frame); return; }
+
+        angle = endAngle;
+        const won = items[selectedIndex];
+        if (resultEl) { resultEl.textContent = `🎁 ${won}`; resultEl.hidden = false; }
+        if (sub) sub.textContent = "Recompensa sorteada!";
+        if (closeBtn) closeBtn.hidden = false;
+        if (spinBtn) spinBtn.hidden = true;
+        playSound("result");
+
+        // Apply life bonus if applicable
+        const lifeMatch = won.match(/\+(\d+)\s*vida/i);
+        if (lifeMatch && playerId) {
+          const amount = parseInt(lifeMatch[1], 10);
+          incLife(playerId, amount);
+          toast(`+${amount} vida para ${state.players.find(p => p.id === playerId)?.name || "jogador"}! 💚`, "success");
+        }
+      }
+
+      requestAnimationFrame(frame);
+    }
+
+    function onClose() {
+      if (_spinDone) return;
+      _spinDone = true;
+      modal.hidden = true;
+      if (spinBtn) spinBtn.removeEventListener("click", onSpin);
+      if (closeBtn) closeBtn.removeEventListener("click", onClose);
+      onDone?.();
+    }
+
+    if (spinBtn) spinBtn.addEventListener("click", onSpin);
+    if (closeBtn) closeBtn.addEventListener("click", onClose);
+  }
+
+  // ===== User attribution badge in player list =====
+  function getMyPlayerId() {
+    const user = window.DivertexUser;
+    if (!user?.name) return null;
+    const me = state.players.find(p => p.name === user.name || p.isMe);
+    return me?.id || null;
+  }
+
+  // ===== SPA Hash Routing =====
+  function _hashForScreen(name) {
+    if (name === "menu") return "";
+    if (name === "wheel") return "wheel";
+    if (name === "likely") return "likely";
+    return "";
+  }
+
+  function _screenForHash(hash) {
+    if (!hash || hash === "") return "menu";
+    if (hash === "wheel") return "wheel";
+    if (hash === "likely") return "likely";
+    return "menu";
+  }
+
   function init() {
     els.themeSelect.value = state.theme;
-    els.challengesInput.value = state.challenges.join("\n");
     setTheme(state.theme);
     setTimerSeconds(els.timerSecondsInput.value);
     setSoundEnabled(false);

@@ -10,9 +10,13 @@ import { onAuthStateChange, getProfile, signOut } from './auth-service.js';
 import { saveSession, saveRound, submitGameStats } from './game-service.js';
 import { getGlobalRanking } from './ranking-service.js';
 import { renderAuthPanel, updateAuthPanel, renderAuthGate } from './auth-ui.js';
+import { openFriendsPanel } from './friends-ui.js';
 
 let currentSession = null;
 let currentSessionId = null;
+
+// Perfil global — lido por likely-game.js e outros minigames
+window.DivertexUser = null;
 
 function getApp() { return window.DivertexApp || null; }
 
@@ -54,9 +58,19 @@ async function init() {
       updateAuthPanel({ session, profile });
       await renderGlobalRanking();
       hideAuthGate();
+
+      // Expõe perfil globalmente para todos os minigames
+      window.DivertexUser = {
+        id: session.user.id,
+        name: profile?.display_name || session.user.email?.split('@')[0] || 'Jogador',
+        avatar: profile?.avatar_url || null,
+      };
+      _showFriendsBtn(true);
     } else {
       updateAuthPanel(null);
       currentSessionId = null;
+      window.DivertexUser = null;
+      _showFriendsBtn(false);
       showAuthGate();
     }
 
@@ -146,6 +160,19 @@ function attachHooks() {
     });
   }
 }
+
+// ---- Botão de amigos ----
+function _showFriendsBtn(visible) {
+  const btn = document.getElementById('friendsOpenBtn');
+  if (!btn) return;
+  if (visible) btn.removeAttribute('hidden');
+  else btn.setAttribute('hidden', '');
+}
+
+document.addEventListener('click', e => {
+  if (e.target.closest('#friendsOpenBtn')) openFriendsPanel();
+  if (e.target.closest('#authSignOutBtn')) signOut();
+});
 
 // ---- Ranking global na tela de menu ----
 async function renderGlobalRanking() {

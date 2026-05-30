@@ -120,11 +120,13 @@ npx vercel alias divertex-kappa-tawny.vercel.app divertex-kappa.vercel.app
 |---------|--------|---------|
 | Cadastro e-mail + senha | ✅ Funciona | Supabase envia e-mail de confirmação |
 | Login e-mail + senha | ✅ Funciona | Requer e-mail confirmado |
-| Perfil pós-login | ✅ Código pronto | authBar mostra nome + botão Sair; criação de perfil via trigger no Supabase |
+| Perfil pós-login | ✅ Funciona | authBar mostra nome + botão Amigos + botão Sair; perfil exposto via `window.DivertexUser` |
 | Salvar sessão de jogo | ✅ Código pronto | Requer usuário logado |
 | Ranking pós-login | ✅ Atualiza automaticamente | |
+| Profile auto-pull em minigames | ✅ Implementado (2026-05-29) | `window.DivertexUser` exposto globalmente; Quem é Mais Provável auto-adiciona o jogador logado |
+| Stats ranking — Quem é Mais Provável | ✅ Implementado (2026-05-29) | `submitGameStats` chamado no `showFinal` com dados reais do jogo |
 | Google OAuth | ❌ UI removida | Provider não ativado no Supabase (falta Client ID/Secret do Google Cloud) |
-| Amizades (UI) | ❌ Pendente | Backend (`js/friends-service.js`) 100% pronto; falta tela no frontend |
+| **Amizades (UI)** | ✅ Implementado (2026-05-29) | Modal com 3 abas: Amigos / Pedidos / Buscar — botão 👥 Amigos aparece na authBar quando logado |
 | Edição de perfil | ❌ Pendente | `updateProfile()` existe no service; falta formulário na UI |
 
 ---
@@ -151,6 +153,9 @@ O PDF (Divertex_Especificacao_Claude.pdf) listava 8 minigames no menu. Implement
 | Minigame | Mecânica (conforme PDF) | Complexidade | Status |
 |----------|------------------------|--------------|--------|
 | **Quem é Mais Provável** | Grupo vota em quem é mais provável; mais votado perde vida | Média | ✅ Implementado (2026-05-28) |
+| **Sorteador de Letras** | Sorteia N letras; cada jogador fala uma palavra da categoria dentro do timer; falhou = perde vida | Média | ✅ Implementado (2026-05-30) |
+| **Sorteador de Números** | Sorteia números em faixa configurável; modos manual/automático/tudo; sem repetição; slot-machine animation | Baixa | ✅ Implementado (2026-05-30) |
+| **Sorteador de Nomes** | Roleta canvas com nomes; easeOutCubic spin; remove vencedor ON/OFF; histórico; auto-add usuário logado | Média | ✅ Implementado (2026-05-30) |
 | **Verdade ou Caos** | Perguntas diretas, desafios e escolhas perigosas — grupo decide o destino | Média | ❌ Pendente |
 | **Cartas do Caos** | Baralho de cartas aleatórias que mudam as regras da partida a cada rodada | Alta | ❌ Pendente |
 | **Duelo de Coragem** | Dois jogadores sorteados se enfrentam em desafios 1v1 | Média | ❌ Pendente |
@@ -174,7 +179,8 @@ O PDF (Divertex_Especificacao_Claude.pdf) listava 8 minigames no menu. Implement
 
 | Item | Situação |
 |------|----------|
-| **UI de amizades** | Backend pronto (`js/friends-service.js`); falta tela: buscar usuário, enviar pedido, aceitar, listar amigos |
+| **UI de amizades** | ✅ Implementado (2026-05-29) — `js/friends-ui.js` + botão 👥 na authBar |
+| **Profile auto-pull** | ✅ Implementado — `window.DivertexUser` + Quem é Mais Provável auto-adiciona usuário logado |
 | **Google OAuth** | Falta criar credenciais no Google Cloud Console e ativar provider no Supabase Dashboard |
 | **Perfil editável** | `updateProfile()` existe; falta formulário com campo de nome e avatar |
 | **Shield/Proteção de jogador** | Coluna `shield` existe no schema Supabase; nunca implementada na lógica do jogo |
@@ -195,16 +201,96 @@ O PDF (Divertex_Especificacao_Claude.pdf) listava 8 minigames no menu. Implement
 | **Sons melhorados** | `playSound("spin")`, `result`, `eliminate`, `win` (fanfare), `click` — todos via Web Audio API sem lib |
 | **Banco corrigido** | Migration 001 aplicada via MCP — 5 tabelas + VIEW. GRANT ao anon/authenticated para o ranking carregar sem login |
 
-## 9. Próximo passo exato (sugerido)
+## 9. Implementado em 2026-05-29 (sessão 2)
 
-**Opção A — UI de amizades** (complementa o sistema de ranking):
-Criar painel de amigos: buscar por nome, enviar pedido, aceitar/recusar, ver ranking entre amigos. Backend (`js/friends-service.js`) 100% pronto.
+| Feature | Detalhe |
+|---------|---------|
+| **UI de amizades** | `js/friends-ui.js` — modal com 3 abas (Amigos / Pedidos / Buscar). Botão 👥 aparece na authBar quando logado. Usa `friends-service.js` existente |
+| **`window.DivertexUser`** | Exposto por `supabase-integration.js` após login: `{ id, name, avatar }`. Lido por todos os minigames |
+| **Profile auto-pull** | Quem é Mais Provável auto-adiciona usuário logado; badge "você" na lista |
+| **Stats — Quem é Mais Provável** | `submitGameStats` chamado em `showFinal` — wins/rounds/livesLost/score vão pro ranking |
+| **Roleta de Recompensas** | Novo checkbox `wheelReward`. Quando ON + "Cumpriu ✓": abre mini wheel canvas com bônus editáveis. "+N vida" aplica vidas automaticamente. Lista salva em localStorage |
+| **Toast system** | `toast(msg, type)` — notificações flutuantes (success/error/info). Substitui `alert()` |
+| **Badge "Você"** | `renderPlayers()` detecta jogador logado e mostra badge. `addPlayer()` marca `isMe: true` |
+| **SPA Hash Routing** | `showScreen()` atualiza URL hash. `popstate` listener: botão Voltar do browser funciona |
+| **Remoção textarea brincadeiras** | `#challengesInput`, `updateChallengesBtn`, `shuffleChallengesBtn` removidos do HTML e do `app.js`. Desafios continuam via `CHALLENGES_BY_MODE` interno |
+| **Transições de tela** | `screenSlideIn` animation em toda navegação |
+| **Event delegation Sair** | `#authSignOutBtn` agora usa delegação — funciona mesmo após re-render da authBar |
 
-**Opção B — Verdade ou Caos** (segundo minigame independente):
-Perguntas diretas ao grupo com votação "Verdade" ou "Caos"; quem fugir paga.
+---
 
-**Opção C — Google OAuth** (melhora conversão de cadastro):
-Ativar no Google Cloud Console + Supabase Dashboard + reativar botão na `auth-ui.js`.
+## 10. Minigames pendentes — PRÓXIMO A IMPLEMENTAR (2026-05-30)
+
+Sessão bateu o limite de tokens antes de concluir. O prompt completo foi escrito mas **não executado**. Retomar na próxima sessão.
+
+### 10.1 Sorteador de Letras (`js/letters-game.js`)
+
+**Conceito:** Sorteia N letras do alfabeto. Cada jogador tem que falar uma palavra/animal/frase com cada letra dentro do tempo. Falhou = perde vida. Último de pé vence.
+
+**Config:**
+- Quantidade de letras por rodada (1–10)
+- Modo: Sequencial (uma letra por vez com timer) ou Simultâneo (todas de uma vez)
+- Tempo por letra (segundos, configurável)
+- Categoria: Livre / Palavra / Animal / Frase / Nome de pessoa
+- Bônus ao conseguir: ON/OFF
+- Sistema de vidas por jogador
+
+**Fluxo:** Setup → Rodada (letras aparecem com animação flip) → Timer countdown → "Conseguiu ✓ / Não conseguiu ✗" → próximo jogador → Final
+
+**Arquivos a criar:**
+- `js/letters-game.js` — IIFE com prefixo DOM `lg-`
+- Seção `#screenLetters` no `index.html`
+- Card no menu com `#openLettersBtn`
+- CSS com prefixo `lg-` (animação flip das letras, timer ring, scoreboard)
+
+**Integração:** `window.DivertexUser` auto-add, `submitGameStats` no final
+
+---
+
+### 10.2 Sorteador de Números (`js/numbers-game.js`)
+
+**Conceito:** Sorteia números em qualquer faixa configurável. Para rifas, jogos, loteria.
+
+**Config:**
+- Range: min e max (presets: 1–10, 1–100, 1–1.000, 1–10.000, ou customizado)
+- Quantidade a sortear (0 = ilimitado)
+- Modo: Manual (apertar botão) / Automático (intervalo em segundos) / Tudo de uma vez
+- Sem repetição: ON/OFF
+
+**Exibição:** Número grande com animação slot-machine (rolagem rápida que desacelera). Grid de histórico com highlight do último sorteado. Barra de progresso. Botão "Copiar todos".
+
+**Arquivos a criar:**
+- `js/numbers-game.js` — IIFE com prefixo DOM `ng-`
+- Seção `#screenNumbers` no `index.html`
+- Card no menu com `#openNumbersBtn`
+- CSS com prefixo `ng-`
+
+---
+
+### 10.3 Sorteador de Nomes (`js/names-wheel.js`)
+
+**Conceito:** Adiciona nomes → gera roleta canvas → sorteia um aleatoriamente. Para rifas, divisão de grupos, decidir quem vai primeiro.
+
+**Config:**
+- Adicionar nomes um a um (ou lista separada por vírgula)
+- Remover vencedor após sortear: ON/OFF
+- Histórico de sorteios
+
+**Exibição:** Wheel canvas igual à Roleta de Vidas (mesmo padrão de `renderWheel()` e `spinOnce()`). Animação easeOutCubic. Overlay com nome vencedor.
+
+**Arquivos a criar:**
+- `js/names-wheel.js` — IIFE com prefixo DOM `nw-`
+- Seção `#screenNames` no `index.html`
+- Card no menu com `#openNamesBtn`
+- CSS com prefixo `nw-`
+
+**Integração:** `window.DivertexUser?.name` auto-adicionado na lista ao entrar
+
+---
+
+## 11. Próximo passo exato
+
+**Todos os 3 minigames implementados.** ~~Sorteador de Letras~~ ✅ → ~~Sorteador de Números~~ ✅ → ~~Sorteador de Nomes~~ ✅ → **Próximo: deploy** (`npx vercel --prod` → alias).
 
 ---
 
