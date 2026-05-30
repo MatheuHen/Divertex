@@ -46,7 +46,6 @@ function _renderGateForm(card, mode) {
   document.getElementById('gateSubmitBtn')?.addEventListener('click', () => _handleGateSubmit(mode));
   document.getElementById('gateForgotLink')?.addEventListener('click', e => { e.preventDefault(); _showForgotPassword(card); });
 
-  // Enter key
   card.querySelectorAll('input').forEach(inp => {
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') _handleGateSubmit(mode); });
   });
@@ -86,23 +85,26 @@ async function _handleGateSubmit(mode) {
     _showGateError(errEl, 'Conta criada! Verifique seu e-mail para ativar.', 'success');
     btn.textContent = 'Verifique seu e-mail';
   }
-  // login success: supabase-integration.js vai esconder o gate via onAuthStateChange
 }
 
+// ---- Tela de recuperação de senha dentro do gate ----
 function _showForgotPassword(card) {
   card.innerHTML = `
-    <div class="authGate__tabs">
-      <button class="authGate__tab authGate__tab--active" type="button" disabled>Recuperar senha</button>
+    <button id="gateBackBtn" class="authGate__backBtn" type="button">← Voltar para o login</button>
+    <div class="authGate__recoverHead">
+      <div class="authGate__recoverIcon">🔑</div>
+      <div class="authGate__recoverTitle">Recuperar senha</div>
+      <p class="authGate__recoverDesc">Informe seu e-mail e enviaremos o link para criar uma nova senha.</p>
     </div>
     <div id="gateError" class="authError" hidden></div>
-    <p style="color:var(--color-text-muted);font-size:.875rem;margin-bottom:1rem;">Informe seu e-mail e enviaremos um link para redefinir sua senha.</p>
     <label class="field">
       <span class="field__label">E-mail</span>
       <input id="gateEmail" class="input" type="email" placeholder="seu@email.com" autocomplete="email" />
     </label>
-    <button id="gateForgotSubmitBtn" class="btn btn--big" type="button" style="width:100%">Enviar link</button>
-    <p class="authSwitch"><a href="#" id="gateBackToLoginLink">Voltar para o login</a></p>
+    <button id="gateForgotSubmitBtn" class="btn btn--big" type="button" style="width:100%">Enviar link de recuperação</button>
   `;
+
+  document.getElementById('gateBackBtn')?.addEventListener('click', () => _renderGateForm(card, 'login'));
 
   document.getElementById('gateForgotSubmitBtn')?.addEventListener('click', async () => {
     const btn = document.getElementById('gateForgotSubmitBtn');
@@ -119,23 +121,83 @@ function _showForgotPassword(card) {
     if (result?.error) {
       _showGateError(errEl, result.error);
       btn.disabled = false;
-      btn.textContent = 'Enviar link';
+      btn.textContent = 'Enviar link de recuperação';
     } else {
-      _showGateError(errEl, 'Link enviado! Verifique seu e-mail.', 'success');
-      btn.textContent = 'E-mail enviado';
+      _showGateError(errEl, 'Link enviado! Verifique sua caixa de e-mail.', 'success');
+      btn.textContent = '✓ E-mail enviado';
     }
   });
 
-  document.getElementById('gateEmail')?.addEventListener('keydown', async e => {
+  document.getElementById('gateEmail')?.addEventListener('keydown', e => {
     if (e.key === 'Enter') document.getElementById('gateForgotSubmitBtn')?.click();
   });
 
-  document.getElementById('gateBackToLoginLink')?.addEventListener('click', e => {
-    e.preventDefault();
-    _renderGateForm(card, 'login');
+  document.getElementById('gateEmail')?.focus();
+}
+
+// ---- Tela de nova senha dentro do gate (chamada após PASSWORD_RECOVERY) ----
+export function renderPasswordResetGate() {
+  const gate = document.getElementById('authGate');
+  if (gate) gate.removeAttribute('hidden');
+
+  const tagline = document.querySelector('.authGate__tagline');
+  if (tagline) tagline.textContent = 'Crie sua nova senha';
+
+  const card = document.getElementById('authGateCard');
+  if (!card) return;
+
+  card.innerHTML = `
+    <div class="authGate__recoverHead">
+      <div class="authGate__recoverIcon">🔐</div>
+      <div class="authGate__recoverTitle">Nova senha</div>
+      <p class="authGate__recoverDesc">Escolha uma senha segura para sua conta.</p>
+    </div>
+    <div id="gateError" class="authError" hidden></div>
+    <label class="field">
+      <span class="field__label">Nova senha</span>
+      <input id="gateNewPassword" class="input" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password" />
+    </label>
+    <label class="field">
+      <span class="field__label">Confirmar senha</span>
+      <input id="gateConfirmPassword" class="input" type="password" placeholder="Repita a senha" autocomplete="new-password" />
+    </label>
+    <button id="gateResetSubmitBtn" class="btn btn--big" type="button" style="width:100%">Salvar nova senha</button>
+  `;
+
+  async function submit() {
+    const btn = document.getElementById('gateResetSubmitBtn');
+    const errEl = document.getElementById('gateError');
+    const newPass = document.getElementById('gateNewPassword')?.value;
+    const confirmPass = document.getElementById('gateConfirmPassword')?.value;
+
+    if (!newPass || newPass.length < 6) { _showGateError(errEl, 'A senha deve ter pelo menos 6 caracteres.'); return; }
+    if (newPass !== confirmPass) { _showGateError(errEl, 'As senhas não coincidem.'); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Salvando…';
+    if (errEl) errEl.hidden = true;
+
+    const result = await updatePassword(newPass);
+    if (result?.error) {
+      _showGateError(errEl, result.error);
+      btn.disabled = false;
+      btn.textContent = 'Salvar nova senha';
+    } else {
+      _showGateError(errEl, 'Senha alterada com sucesso!', 'success');
+      btn.textContent = '✓ Senha salva';
+      setTimeout(() => {
+        if (tagline) tagline.textContent = 'Minigames para todo o grupo';
+      }, 2000);
+      // gate vai fechar via onAuthStateChange → SIGNED_IN
+    }
+  }
+
+  document.getElementById('gateResetSubmitBtn')?.addEventListener('click', submit);
+  card.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
   });
 
-  document.getElementById('gateEmail')?.focus();
+  document.getElementById('gateNewPassword')?.focus();
 }
 
 function _showGateError(el, msg, type = 'error') {
@@ -188,7 +250,7 @@ export function updateAuthPanel(data) {
   `;
 }
 
-// ---- Modal de login/cadastro ----
+// ---- Modal de login/cadastro (navbar) ----
 function showAuthModal(mode) {
   let modal = document.getElementById('authModal');
   if (modal) modal.remove();
@@ -242,78 +304,29 @@ function showAuthModal(mode) {
 
   document.body.appendChild(modal);
 
-  // Eventos
   modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
   document.getElementById('authModalClose')?.addEventListener('click', () => modal.remove());
   document.getElementById('authSwitchLink')?.addEventListener('click', e => { e.preventDefault(); modal.remove(); showAuthModal(isLogin ? 'signup' : 'login'); });
-  document.getElementById('authSubmitBtn')?.addEventListener('click', () => handleSubmit(mode));
+  document.getElementById('authSubmitBtn')?.addEventListener('click', () => _handleModalSubmit(mode));
   document.getElementById('authForgotLink')?.addEventListener('click', e => { e.preventDefault(); _showModalForgotPassword(modal); });
+
+  modal.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') _handleModalSubmit(mode); });
+  });
 
   document.getElementById(isLogin ? 'authEmail' : 'authName')?.focus();
 }
 
-function _showModalForgotPassword(modal) {
-  const box = modal.querySelector('.modal__box');
-  if (!box) return;
-
-  box.innerHTML = `
-    <div class="modal__title">Recuperar senha</div>
-    <div id="authError" class="authError" hidden></div>
-    <p style="color:var(--color-text-muted);font-size:.875rem;margin-bottom:1rem;">Informe seu e-mail e enviaremos um link para redefinir sua senha.</p>
-    <label class="field">
-      <span class="field__label">E-mail</span>
-      <input id="authEmail" class="input" type="email" placeholder="seu@email.com" autocomplete="email" />
-    </label>
-    <button id="authForgotSubmitBtn" class="btn btn--big" type="button" style="width:100%">Enviar link</button>
-    <p class="authSwitch"><a href="#" id="authBackToLoginLink">Voltar para o login</a></p>
-    <button id="authModalClose" class="modal__closeX" type="button" aria-label="Fechar">✕</button>
-  `;
-
-  modal.querySelector('#authModalClose')?.addEventListener('click', () => modal.remove());
-  modal.querySelector('#authBackToLoginLink')?.addEventListener('click', e => { e.preventDefault(); modal.remove(); showAuthModal('login'); });
-
-  modal.querySelector('#authForgotSubmitBtn')?.addEventListener('click', async () => {
-    const btn = modal.querySelector('#authForgotSubmitBtn');
-    const errEl = modal.querySelector('#authError');
-    const email = modal.querySelector('#authEmail')?.value?.trim();
-
-    if (!email) { showError(errEl, 'Informe seu e-mail.'); return; }
-
-    btn.disabled = true;
-    btn.textContent = 'Enviando…';
-    errEl.hidden = true;
-
-    const result = await resetPassword({ email });
-    if (result?.error) {
-      showError(errEl, result.error);
-      btn.disabled = false;
-      btn.textContent = 'Enviar link';
-    } else {
-      showError(errEl, 'Link enviado! Verifique seu e-mail.', 'success');
-      btn.textContent = 'E-mail enviado';
-    }
-  });
-
-  modal.querySelector('#authEmail')?.addEventListener('keydown', e => {
-    if (e.key === 'Enter') modal.querySelector('#authForgotSubmitBtn')?.click();
-  });
-
-  modal.querySelector('#authEmail')?.focus();
-}
-
-async function handleSubmit(mode) {
+async function _handleModalSubmit(mode) {
   const btn = document.getElementById('authSubmitBtn');
   const errEl = document.getElementById('authError');
   const email = document.getElementById('authEmail')?.value?.trim();
   const password = document.getElementById('authPassword')?.value;
 
-  if (!email || !password) {
-    showError(errEl, 'Preencha e-mail e senha.');
-    return;
-  }
+  if (!email || !password) { showError(errEl, 'Preencha e-mail e senha.'); return; }
 
   btn.disabled = true;
-  btn.textContent = 'Aguarde...';
+  btn.textContent = 'Aguarde…';
   errEl.hidden = true;
 
   let result;
@@ -340,74 +353,60 @@ async function handleSubmit(mode) {
   }
 }
 
+function _showModalForgotPassword(modal) {
+  const box = modal.querySelector('.modal__box');
+  if (!box) return;
+
+  box.innerHTML = `
+    <button id="authModalBackBtn" class="authModal__backBtn" type="button">← Voltar</button>
+    <div class="modal__title">Recuperar senha</div>
+    <p class="authModal__desc">Informe seu e-mail e enviaremos o link para criar uma nova senha.</p>
+    <div id="authError" class="authError" hidden></div>
+    <label class="field">
+      <span class="field__label">E-mail</span>
+      <input id="authEmail" class="input" type="email" placeholder="seu@email.com" autocomplete="email" />
+    </label>
+    <button id="authForgotSubmitBtn" class="btn btn--big" type="button" style="width:100%">Enviar link de recuperação</button>
+    <button id="authModalClose" class="modal__closeX" type="button" aria-label="Fechar">✕</button>
+  `;
+
+  modal.querySelector('#authModalClose')?.addEventListener('click', () => modal.remove());
+  modal.querySelector('#authModalBackBtn')?.addEventListener('click', () => { modal.remove(); showAuthModal('login'); });
+
+  modal.querySelector('#authForgotSubmitBtn')?.addEventListener('click', async () => {
+    const btn = modal.querySelector('#authForgotSubmitBtn');
+    const errEl = modal.querySelector('#authError');
+    const email = modal.querySelector('#authEmail')?.value?.trim();
+
+    if (!email) { showError(errEl, 'Informe seu e-mail.'); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Enviando…';
+    errEl.hidden = true;
+
+    const result = await resetPassword({ email });
+    if (result?.error) {
+      showError(errEl, result.error);
+      btn.disabled = false;
+      btn.textContent = 'Enviar link de recuperação';
+    } else {
+      showError(errEl, 'Link enviado! Verifique sua caixa de e-mail.', 'success');
+      btn.textContent = '✓ E-mail enviado';
+    }
+  });
+
+  modal.querySelector('#authEmail')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') modal.querySelector('#authForgotSubmitBtn')?.click();
+  });
+
+  modal.querySelector('#authEmail')?.focus();
+}
 
 function showError(el, msg, type = 'error') {
   if (!el) return;
   el.textContent = msg;
   el.hidden = false;
   el.className = `authError authError--${type}`;
-}
-
-// ---- Modal de redefinição de senha (após clicar no link do e-mail) ----
-export function showPasswordResetModal() {
-  let modal = document.getElementById('authModal');
-  if (modal) modal.remove();
-
-  modal = document.createElement('div');
-  modal.id = 'authModal';
-  modal.className = 'modal';
-  modal.setAttribute('role', 'dialog');
-  modal.setAttribute('aria-modal', 'true');
-
-  modal.innerHTML = `
-    <div class="modal__box">
-      <div class="modal__title">Criar nova senha</div>
-      <div id="authError" class="authError" hidden></div>
-      <label class="field">
-        <span class="field__label">Nova senha</span>
-        <input id="authNewPassword" class="input" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password" />
-      </label>
-      <label class="field">
-        <span class="field__label">Confirmar nova senha</span>
-        <input id="authConfirmPassword" class="input" type="password" placeholder="Repita a senha" autocomplete="new-password" />
-      </label>
-      <button id="authResetSubmitBtn" class="btn btn--big" type="button" style="width:100%">Salvar nova senha</button>
-    </div>
-  `;
-
-  document.body.appendChild(modal);
-
-  async function submit() {
-    const btn = modal.querySelector('#authResetSubmitBtn');
-    const errEl = modal.querySelector('#authError');
-    const newPass = modal.querySelector('#authNewPassword')?.value;
-    const confirmPass = modal.querySelector('#authConfirmPassword')?.value;
-
-    if (!newPass || newPass.length < 6) { showError(errEl, 'A senha deve ter pelo menos 6 caracteres.'); return; }
-    if (newPass !== confirmPass) { showError(errEl, 'As senhas não coincidem.'); return; }
-
-    btn.disabled = true;
-    btn.textContent = 'Salvando…';
-    errEl.hidden = true;
-
-    const result = await updatePassword(newPass);
-    if (result?.error) {
-      showError(errEl, result.error);
-      btn.disabled = false;
-      btn.textContent = 'Salvar nova senha';
-    } else {
-      showError(errEl, 'Senha alterada com sucesso!', 'success');
-      btn.textContent = 'Senha salva ✓';
-      setTimeout(() => modal.remove(), 2000);
-    }
-  }
-
-  modal.querySelector('#authResetSubmitBtn')?.addEventListener('click', submit);
-  modal.querySelectorAll('input').forEach(inp => {
-    inp.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
-  });
-
-  modal.querySelector('#authNewPassword')?.focus();
 }
 
 function escHtml(str) {

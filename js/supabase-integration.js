@@ -9,7 +9,7 @@ import { isReady } from './supabase-client.js';
 import { onAuthStateChange, getProfile, signOut } from './auth-service.js';
 import { saveSession, saveRound, submitGameStats } from './game-service.js';
 import { getGlobalRanking } from './ranking-service.js';
-import { renderAuthPanel, updateAuthPanel, renderAuthGate, showPasswordResetModal } from './auth-ui.js';
+import { renderAuthPanel, updateAuthPanel, renderAuthGate, renderPasswordResetGate } from './auth-ui.js';
 import { openFriendsPanel } from './friends-ui.js';
 
 let currentSession = null;
@@ -53,7 +53,7 @@ async function init() {
   onAuthStateChange(async (event, session) => {
     // Usuário voltou do link de recuperação de senha
     if (event === 'PASSWORD_RECOVERY') {
-      showPasswordResetModal();
+      renderPasswordResetGate();
       return;
     }
 

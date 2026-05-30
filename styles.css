@@ -1457,6 +1457,76 @@ html[data-theme="darklove"] body {
   font-weight: 700;
 }
 
+/* ===== Auth Gate — recuperação de senha ===== */
+.authGate__backBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-family: var(--fontBody);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0 0 4px;
+  line-height: 1;
+  opacity: 0.85;
+  transition: opacity 0.15s;
+  margin-bottom: 12px;
+}
+.authGate__backBtn:hover { opacity: 1; }
+
+.authGate__recoverHead {
+  text-align: center;
+  margin-bottom: 16px;
+}
+.authGate__recoverIcon {
+  font-size: 36px;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+.authGate__recoverTitle {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.authGate__recoverDesc {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ===== Modal navbar — recuperação de senha ===== */
+.authModal__backBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-family: var(--fontBody);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  margin-bottom: 4px;
+  opacity: 0.85;
+  transition: opacity 0.15s;
+}
+.authModal__backBtn:hover { opacity: 1; }
+
+.authModal__desc {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0 0 4px;
+  text-align: left;
+}
+
 /* =============================================
    Menu: diffs pills e coming-soon cards
    ============================================= */
