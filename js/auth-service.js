@@ -39,7 +39,26 @@ export async function signUp({ email, password, displayName }) {
   });
 
   if (error) return { error: translateError(error.message) };
+
+  // Supabase retorna sucesso com identities vazio quando o email já existe (email enumeration protection)
+  if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+    return { error: 'Este e-mail já está cadastrado. Tente fazer login.' };
+  }
+
   return { user: data.user, session: data.session };
+}
+
+// ---- Recuperar senha ----
+export async function resetPassword({ email }) {
+  const sb = getClient();
+  if (!sb) return { error: 'Supabase não configurado.' };
+
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}#reset-password`,
+  });
+
+  if (error) return { error: translateError(error.message) };
+  return {};
 }
 
 // ---- Login com e-mail/senha ----
@@ -115,10 +134,20 @@ export async function updateProfile({ displayName, avatarUrl }) {
   return {};
 }
 
+// ---- Atualizar senha (usado após PASSWORD_RECOVERY) ----
+export async function updatePassword(newPassword) {
+  const sb = getClient();
+  if (!sb) return { error: 'Supabase não configurado.' };
+  const { error } = await sb.auth.updateUser({ password: newPassword });
+  if (error) return { error: translateError(error.message) };
+  return {};
+}
+
 // ---- Ouvinte de mudanças na sessão ----
+// callback recebe (event, session)
 export function onAuthStateChange(callback) {
   const sb = getClient();
   if (!sb) return () => {};
-  const { data } = sb.auth.onAuthStateChange((_event, session) => callback(session));
+  const { data } = sb.auth.onAuthStateChange((event, session) => callback(event, session));
   return () => data.subscription.unsubscribe();
 }
