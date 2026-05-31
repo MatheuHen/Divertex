@@ -140,6 +140,11 @@ function _showForgotPassword(card) {
 
 // ---- Tela de nova senha dentro do gate (chamada após PASSWORD_RECOVERY) ----
 export function renderPasswordResetGate() {
+  // Limpa o hash da URL para não re-triggar recovery no refresh
+  if (window.history?.replaceState) {
+    window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+  }
+
   const gate = document.getElementById('authGate');
   if (gate) gate.removeAttribute('hidden');
 

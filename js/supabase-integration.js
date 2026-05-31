@@ -15,6 +15,10 @@ import { openFriendsPanel } from './friends-ui.js';
 let currentSession = null;
 let currentSessionId = null;
 
+// Flag que bloqueia SIGNED_IN/INITIAL_SESSION enquanto o usuário está no fluxo de
+// redefinição de senha — evita que o gate feche antes de salvar a nova senha.
+let _recoveryMode = false;
+
 // Perfil global — lido por likely-game.js e outros minigames
 window.DivertexUser = null;
 
@@ -29,64 +33,98 @@ function showAuthGate() {
 function hideAuthGate() {
   const gate = document.getElementById('authGate');
   if (gate) gate.setAttribute('hidden', '');
-  // Ativa a tela do menu
   const menu = document.getElementById('screenMenu');
   if (menu) menu.classList.add('screen--active');
+}
+
+// Detecta se a URL atual é um redirect de recuperação de senha.
+// O Supabase usa hash-based redirect para email OTP:
+// #access_token=...&type=recovery
+// Precisa rodar ANTES do Supabase processar a URL para evitar race condition.
+function _detectRecoveryFromUrl() {
+  const hash = window.location.hash;
+  if (!hash) return false;
+  try {
+    const params = new URLSearchParams(hash.replace(/^#/, ''));
+    return params.get('type') === 'recovery';
+  } catch {
+    return false;
+  }
+}
+
+async function _handleSession(session) {
+  currentSession = session;
+  const profile = await getProfile(session.user.id);
+  updateAuthPanel({ session, profile });
+  await renderGlobalRanking();
+  hideAuthGate();
+  window.DivertexUser = {
+    id: session.user.id,
+    name: profile?.display_name || session.user.email?.split('@')[0] || 'Jogador',
+    avatar: profile?.avatar_url || null,
+  };
+  _showFriendsBtn(true);
+  if (getApp()) getApp().currentUser = { id: session.user.id };
 }
 
 // ---- Inicializa quando DOM estiver pronto ----
 async function init() {
   if (!isReady()) {
     console.log('[Divertex] Supabase não configurado — modo local ativo.');
-    hideAuthGate(); // Sem Supabase, deixa jogar sem login
+    hideAuthGate();
     renderAuthPanel(null);
     return;
   }
 
-  // Mostra gate de login
+  // CRÍTICO: detectar recovery URL ANTES do Supabase processar o hash.
+  // O Supabase v2 usa initialize() assíncrono — se esperarmos pelo evento
+  // PASSWORD_RECOVERY no onAuthStateChange, o evento já terá sido disparado
+  // sem listener e o Supabase vai re-emitir como SIGNED_IN, fechando o gate.
+  _recoveryMode = _detectRecoveryFromUrl();
+
   showAuthGate();
 
-  // Carrega ranking público na inicialização (não requer login)
-  renderGlobalRanking();
+  if (_recoveryMode) {
+    // Mostra form de nova senha imediatamente, sem esperar onAuthStateChange
+    renderPasswordResetGate();
+  } else {
+    renderGlobalRanking();
+  }
 
-  // Ouve mudanças de auth
   onAuthStateChange(async (event, session) => {
-    // Usuário voltou do link de recuperação de senha
+    // PASSWORD_RECOVERY: cobre PKCE (code-based) onde não detectamos pela hash
     if (event === 'PASSWORD_RECOVERY') {
+      _recoveryMode = true;
       renderPasswordResetGate();
       return;
     }
 
+    // USER_UPDATED: senha salva com sucesso → sai do modo recovery
+    // e cai no fluxo normal abaixo para logar o usuário
+    if (event === 'USER_UPDATED') {
+      _recoveryMode = false;
+      // fall-through intencional
+    }
+
+    // Enquanto em recovery mode, bloqueia SIGNED_IN e INITIAL_SESSION
+    // para não fechar o formulário de nova senha prematuramente
+    if (_recoveryMode) return;
+
+    // ---- Fluxo normal de auth ----
     currentSession = session;
 
     if (session) {
-      const profile = await getProfile(session.user.id);
-      updateAuthPanel({ session, profile });
-      await renderGlobalRanking();
-      hideAuthGate();
-
-      // Expõe perfil globalmente para todos os minigames
-      window.DivertexUser = {
-        id: session.user.id,
-        name: profile?.display_name || session.user.email?.split('@')[0] || 'Jogador',
-        avatar: profile?.avatar_url || null,
-      };
-      _showFriendsBtn(true);
+      await _handleSession(session);
     } else {
       updateAuthPanel(null);
       currentSessionId = null;
       window.DivertexUser = null;
       _showFriendsBtn(false);
       showAuthGate();
-    }
-
-    // Expõe sessão para o app
-    if (getApp()) {
-      getApp().currentUser = session ? { id: session.user.id } : null;
+      if (getApp()) getApp().currentUser = null;
     }
   });
 
-  // Hooks do DivertexApp
   waitForApp();
 }
 
@@ -101,13 +139,11 @@ function waitForApp() {
 function attachHooks() {
   const app = getApp();
 
-  // Após cada rodada: salva no Supabase se logado
   app.onRoundComplete = async (roundData) => {
     if (!currentSession || !currentSessionId) return;
     await saveRound(currentSessionId, roundData);
   };
 
-  // Quando vence: submete stats
   app.onWinner = async ({ winnerName, totalRounds, totalLivesLost }) => {
     if (!currentSession) return;
     const score = Math.max(0, totalRounds * 10 + 50 - totalLivesLost * 2);
@@ -120,7 +156,6 @@ function attachHooks() {
     });
   };
 
-  // Botão salvar partida (injetado no HTML)
   const saveBtn = document.getElementById('saveSessionBtn');
   if (saveBtn) {
     saveBtn.addEventListener('click', async () => {
@@ -158,7 +193,6 @@ function attachHooks() {
     });
   }
 
-  // Botão sair
   const signOutBtn = document.getElementById('authSignOutBtn');
   if (signOutBtn) {
     signOutBtn.addEventListener('click', async () => {
