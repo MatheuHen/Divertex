@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Roleta de Vidas</title>
+    <title>Divertex — Minigames para todo o grupo</title>
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20100%20100%27%3E%3Ctext%20y%3D%27.9em%27%20font-size%3D%2790%27%3E%F0%9F%8E%A1%3C/text%3E%3C/svg%3E"
@@ -17,6 +17,19 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <!-- Captura intent de recovery ANTES de qualquer módulo/script defer processar a URL.
+         Scripts inline rodam sincronamente antes de <script type="module">.
+         O Supabase limpa window.location.hash ao processar o token — se esperarmos,
+         já é tarde demais. -->
+    <script>
+      try {
+        var _h = window.location.hash;
+        window.__DIVERTEX_RECOVERY = Boolean(
+          _h && new URLSearchParams(_h.replace(/^#/, '')).get('type') === 'recovery'
+        );
+      } catch (e) { window.__DIVERTEX_RECOVERY = false; }
+    </script>
+
     <!-- Auth Gate — exibido antes de qualquer tela até o usuário logar -->
     <div id="authGate" class="authGate" role="dialog" aria-modal="true" aria-label="Autenticação Divertex">
       <div class="authGate__bg">

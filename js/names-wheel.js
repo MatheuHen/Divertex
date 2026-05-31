@@ -53,7 +53,7 @@
     const canvas = $('nwCanvas');
     if (!canvas) return;
     const wrap = canvas.parentElement;
-    const size = Math.max(260, Math.min((wrap?.clientWidth || 380) - 4, 420));
+    const size = Math.max(260, Math.min((wrap?.clientWidth || 420) - 4, 500));
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     wheel.dpr = dpr;
     canvas.width = Math.floor(size * dpr);
@@ -99,17 +99,37 @@
     ctx.fill();
 
     if (!names.length) {
+      // Gradient fill
+      const emptyGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, innerR);
+      emptyGrad.addColorStop(0, 'rgba(20,184,166,0.12)');
+      emptyGrad.addColorStop(1, 'rgba(0,0,0,0.35)');
       ctx.beginPath();
       ctx.arc(0, 0, innerR, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(0,0,0,0.28)';
+      ctx.fillStyle = emptyGrad;
       ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.55)';
-      const fs = Math.floor(r * 0.09);
-      ctx.font = `900 ${fs}px sans-serif`;
+      // Dashed border
+      ctx.setLineDash([8, 6]);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(20,184,166,0.4)';
+      ctx.beginPath();
+      ctx.arc(0, 0, innerR - 2, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // Icon
+      const iconFs = Math.floor(r * 0.22);
+      ctx.font = `${iconFs}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('Adicione', 0, -Math.floor(r * 0.06));
-      ctx.fillText('nomes →', 0, Math.floor(r * 0.07));
+      ctx.fillText('🎯', 0, -Math.floor(r * 0.12));
+      // Text
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      const fs = Math.floor(r * 0.09);
+      ctx.font = `800 ${fs}px system-ui`;
+      ctx.fillText('Adicione nomes', 0, Math.floor(r * 0.08));
+      const fs2 = Math.floor(r * 0.075);
+      ctx.font = `600 ${fs2}px system-ui`;
+      ctx.fillStyle = 'rgba(20,184,166,0.9)';
+      ctx.fillText('e gire a roleta!', 0, Math.floor(r * 0.19));
       ctx.restore();
       return;
     }

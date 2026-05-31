@@ -12,6 +12,10 @@ import { getGlobalRanking } from './ranking-service.js';
 import { renderAuthPanel, updateAuthPanel, renderAuthGate, renderPasswordResetGate } from './auth-ui.js';
 import { openFriendsPanel } from './friends-ui.js';
 
+// Flag lida do script inline em index.html — captura type=recovery ANTES
+// de qualquer módulo defer rodar. Scripts inline executam antes de <script type="module">.
+const _RECOVERY_ON_LOAD = Boolean(window.__DIVERTEX_RECOVERY);
+
 let currentSession = null;
 let currentSessionId = null;
 
@@ -35,21 +39,6 @@ function hideAuthGate() {
   if (gate) gate.setAttribute('hidden', '');
   const menu = document.getElementById('screenMenu');
   if (menu) menu.classList.add('screen--active');
-}
-
-// Detecta se a URL atual é um redirect de recuperação de senha.
-// O Supabase usa hash-based redirect para email OTP:
-// #access_token=...&type=recovery
-// Precisa rodar ANTES do Supabase processar a URL para evitar race condition.
-function _detectRecoveryFromUrl() {
-  const hash = window.location.hash;
-  if (!hash) return false;
-  try {
-    const params = new URLSearchParams(hash.replace(/^#/, ''));
-    return params.get('type') === 'recovery';
-  } catch {
-    return false;
-  }
 }
 
 async function _handleSession(session) {
@@ -76,11 +65,8 @@ async function init() {
     return;
   }
 
-  // CRÍTICO: detectar recovery URL ANTES do Supabase processar o hash.
-  // O Supabase v2 usa initialize() assíncrono — se esperarmos pelo evento
-  // PASSWORD_RECOVERY no onAuthStateChange, o evento já terá sido disparado
-  // sem listener e o Supabase vai re-emitir como SIGNED_IN, fechando o gate.
-  _recoveryMode = _detectRecoveryFromUrl();
+  // Usar flag lida no carregamento do módulo (antes do Supabase processar a URL)
+  _recoveryMode = _RECOVERY_ON_LOAD;
 
   showAuthGate();
 
