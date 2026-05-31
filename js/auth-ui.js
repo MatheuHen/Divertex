@@ -38,7 +38,10 @@ function _renderGateForm(card, mode) {
     <button id="gateSubmitBtn" class="btn btn--big" type="button" style="width:100%">
       ${isLogin ? 'Entrar' : 'Criar conta'}
     </button>
-    ${isLogin ? `<p class="authSwitch"><a href="#" id="gateForgotLink">Esqueci minha senha</a></p>` : ''}
+    ${isLogin ? `
+    <div class="authGate__forgotWrap">
+      <a href="#" id="gateForgotLink" class="authGate__forgotBtn">🔑 Esqueci minha senha</a>
+    </div>` : ''}
   `;
 
   document.getElementById('gateTabLogin')?.addEventListener('click', () => _renderGateForm(card, 'login'));
