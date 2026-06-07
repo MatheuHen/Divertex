@@ -108,9 +108,12 @@ async function _handlePkceCallback() {
 
     if (error) {
       console.error('[AUTH CALLBACK] erro no exchange:', error.message);
-      _pkceInProgress = false;
+      // Mantém _pkceInProgress = true para que INITIAL_SESSION(null) não sobrescreva
+      // o card de erro — só reseta quando o usuário clicar em retry/voltar
       if (!currentSession && !_recoveryMode) {
         _showCallbackError(card, error.message);
+      } else {
+        _pkceInProgress = false;
       }
       return;
     }
@@ -176,9 +179,11 @@ function _showCallbackError(card, detail) {
     </div>
   `;
   document.getElementById('cbRetryBtn')?.addEventListener('click', () => {
+    _pkceInProgress = false;
     window.location.href = window.location.origin;
   });
   document.getElementById('cbBackBtn')?.addEventListener('click', () => {
+    _pkceInProgress = false;
     renderAuthGate('login');
   });
 }
