@@ -4,7 +4,9 @@
  * Opera via DOM — sem dependência de frameworks.
  */
 
-import { signIn, signUp, resetPassword, updatePassword } from './auth-service.js';
+import { signIn, signUp, resetPassword, updatePassword, signInWithGoogle } from './auth-service.js';
+
+const GOOGLE_ICON = `<svg class="google-icon" viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>`;
 
 // ---- Renderiza formulário completo no Auth Gate ----
 export function renderAuthGate(defaultMode = 'login') {
@@ -33,7 +35,7 @@ function _renderGateForm(card, mode) {
     </label>
     <label class="field">
       <span class="field__label">Senha</span>
-      <input id="gatePassword" class="input" type="password" placeholder="${isLogin ? 'Sua senha' : 'Mínimo 6 caracteres'}" autocomplete="${isLogin ? 'current-password' : 'new-password'}" />
+      <input id="gatePassword" class="input" type="password" placeholder="${isLogin ? 'Sua senha' : 'Mínimo 8 caracteres'}" autocomplete="${isLogin ? 'current-password' : 'new-password'}" />
     </label>
     <button id="gateSubmitBtn" class="btn btn--big" type="button" style="width:100%">
       ${isLogin ? 'Entrar' : 'Criar conta'}
@@ -42,12 +44,17 @@ function _renderGateForm(card, mode) {
     <div class="authGate__forgotWrap">
       <a href="#" id="gateForgotLink" class="authGate__forgotBtn">🔑 Esqueci minha senha</a>
     </div>` : ''}
+    <div class="authDivider"><span>ou</span></div>
+    <button id="gateGoogleBtn" class="btn btn--google" type="button" style="width:100%">
+      ${GOOGLE_ICON} ${isLogin ? 'Entrar com Google' : 'Criar conta com Google'}
+    </button>
   `;
 
   document.getElementById('gateTabLogin')?.addEventListener('click', () => _renderGateForm(card, 'login'));
   document.getElementById('gateTabSignup')?.addEventListener('click', () => _renderGateForm(card, 'signup'));
   document.getElementById('gateSubmitBtn')?.addEventListener('click', () => _handleGateSubmit(mode));
   document.getElementById('gateForgotLink')?.addEventListener('click', e => { e.preventDefault(); _showForgotPassword(card); });
+  document.getElementById('gateGoogleBtn')?.addEventListener('click', () => _handleGoogleAuth(document.getElementById('gateError')));
 
   card.querySelectorAll('input').forEach(inp => {
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') _handleGateSubmit(mode); });
@@ -140,9 +147,9 @@ function _showForgotPassword(card) {
 
 // ---- Tela de nova senha dentro do gate (chamada após PASSWORD_RECOVERY) ----
 export function renderPasswordResetGate() {
-  // Limpa o hash da URL para não re-triggar recovery no refresh
+  // Limpa hash e query params da URL para não re-triggar recovery no refresh
   if (window.history?.replaceState) {
-    window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+    window.history.replaceState({}, document.title, window.location.pathname);
   }
 
   const gate = document.getElementById('authGate');
@@ -163,7 +170,7 @@ export function renderPasswordResetGate() {
     <div id="gateError" class="authError" hidden></div>
     <label class="field">
       <span class="field__label">Nova senha</span>
-      <input id="gateNewPassword" class="input" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password" />
+      <input id="gateNewPassword" class="input" type="password" placeholder="Mínimo 8 caracteres" autocomplete="new-password" />
     </label>
     <label class="field">
       <span class="field__label">Confirmar senha</span>
@@ -178,7 +185,7 @@ export function renderPasswordResetGate() {
     const newPass = document.getElementById('gateNewPassword')?.value;
     const confirmPass = document.getElementById('gateConfirmPassword')?.value;
 
-    if (!newPass || newPass.length < 6) { _showGateError(errEl, 'A senha deve ter pelo menos 6 caracteres.'); return; }
+    if (!newPass || newPass.length < 8) { _showGateError(errEl, 'A senha deve ter pelo menos 8 caracteres.'); return; }
     if (newPass !== confirmPass) { _showGateError(errEl, 'As senhas não coincidem.'); return; }
 
     btn.disabled = true;
@@ -291,11 +298,16 @@ function showAuthModal(mode) {
 
       <label class="field">
         <span class="field__label">Senha</span>
-        <input id="authPassword" class="input" type="password" placeholder="${isLogin ? 'Sua senha' : 'Mínimo 6 caracteres'}" autocomplete="${isLogin ? 'current-password' : 'new-password'}" />
+        <input id="authPassword" class="input" type="password" placeholder="${isLogin ? 'Sua senha' : 'Mínimo 8 caracteres'}" autocomplete="${isLogin ? 'current-password' : 'new-password'}" />
       </label>
 
       <button id="authSubmitBtn" class="btn btn--big" type="button">
         ${isLogin ? 'Entrar' : 'Criar conta'}
+      </button>
+
+      <div class="authDivider"><span>ou</span></div>
+      <button id="authGoogleBtn" class="btn btn--google" type="button" style="width:100%">
+        ${GOOGLE_ICON} ${isLogin ? 'Entrar com Google' : 'Criar conta com Google'}
       </button>
 
       <p class="authSwitch">
@@ -317,6 +329,7 @@ function showAuthModal(mode) {
   document.getElementById('authSwitchLink')?.addEventListener('click', e => { e.preventDefault(); modal.remove(); showAuthModal(isLogin ? 'signup' : 'login'); });
   document.getElementById('authSubmitBtn')?.addEventListener('click', () => _handleModalSubmit(mode));
   document.getElementById('authForgotLink')?.addEventListener('click', e => { e.preventDefault(); _showModalForgotPassword(modal); });
+  document.getElementById('authGoogleBtn')?.addEventListener('click', () => { modal.remove(); _handleGoogleAuth(null); });
 
   modal.querySelectorAll('input').forEach(inp => {
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') _handleModalSubmit(mode); });
@@ -408,6 +421,13 @@ function _showModalForgotPassword(modal) {
   });
 
   modal.querySelector('#authEmail')?.focus();
+}
+
+async function _handleGoogleAuth(errEl) {
+  const result = await signInWithGoogle();
+  if (result?.error && errEl) {
+    _showGateError(errEl, result.error);
+  }
 }
 
 function showError(el, msg, type = 'error') {

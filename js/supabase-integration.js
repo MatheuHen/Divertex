@@ -12,9 +12,10 @@ import { getGlobalRanking } from './ranking-service.js';
 import { renderAuthPanel, updateAuthPanel, renderAuthGate, renderPasswordResetGate } from './auth-ui.js';
 import { openFriendsPanel } from './friends-ui.js';
 
-// Flag lida do script inline em index.html — captura type=recovery ANTES
+// Flags lidas do script inline em index.html — capturam o estado da URL ANTES
 // de qualquer módulo defer rodar. Scripts inline executam antes de <script type="module">.
 const _RECOVERY_ON_LOAD = Boolean(window.__DIVERTEX_RECOVERY);
+const _PKCE_ON_LOAD = Boolean(window.__DIVERTEX_PKCE);
 
 let currentSession = null;
 let currentSessionId = null;
@@ -71,8 +72,17 @@ async function init() {
   showAuthGate();
 
   if (_recoveryMode) {
-    // Mostra form de nova senha imediatamente, sem esperar onAuthStateChange
+    // Implicit flow: hash continha type=recovery — mostra form imediatamente
     renderPasswordResetGate();
+  } else if (_PKCE_ON_LOAD) {
+    // PKCE flow: há um code= na URL — aguardar troca assíncrona antes de mostrar UI
+    // Mostra loader; onAuthStateChange vai disparar PASSWORD_RECOVERY ou SIGNED_IN
+    const card = document.getElementById('authGateCard');
+    if (card) card.innerHTML = '<div class="authGate__loading">Verificando…</div>';
+    // Fallback: se a troca não completar em 8s, mostrar login normal
+    setTimeout(() => {
+      if (!currentSession && !_recoveryMode) renderAuthGate();
+    }, 8000);
   } else {
     renderGlobalRanking();
   }

@@ -24,10 +24,17 @@
     <script>
       try {
         var _h = window.location.hash;
+        var _q = window.location.search;
+        // Implicit flow: hash contém type=recovery
         window.__DIVERTEX_RECOVERY = Boolean(
           _h && new URLSearchParams(_h.replace(/^#/, '')).get('type') === 'recovery'
         );
-      } catch (e) { window.__DIVERTEX_RECOVERY = false; }
+        // PKCE flow: query string contém code= (troca assíncrona — aguardar onAuthStateChange)
+        window.__DIVERTEX_PKCE = Boolean(_q && new URLSearchParams(_q).get('code'));
+      } catch (e) {
+        window.__DIVERTEX_RECOVERY = false;
+        window.__DIVERTEX_PKCE = false;
+      }
     </script>
 
     <!-- Auth Gate — exibido antes de qualquer tela até o usuário logar -->
@@ -117,6 +124,38 @@
             <div class="gameCard__title">Sorteador de Nomes</div>
             <div class="gameCard__desc">Adicione os nomes, gire a roleta e descubra o sortudo. Para rifas, decisões difíceis ou escolher quem vai pagar a conta.</div>
             <button id="openNamesBtn" class="btn btn--big" type="button">Girar agora</button>
+          </article>
+
+          <!-- Minigame 6: Verdade ou Caos -->
+          <article class="gameCard gameCard--truth">
+            <div class="gameCard__icon" aria-hidden="true">🎭</div>
+            <div class="gameCard__title">Verdade ou Caos</div>
+            <div class="gameCard__desc">Na sua vez: escolha Verdade (responda honestamente) ou Caos (cumpra o desafio). Recusar = perde uma vida. Último de pé vence.</div>
+            <button id="openVerdadeBtn" class="btn btn--big" type="button">Jogar agora</button>
+          </article>
+
+          <!-- Minigame 7: Cartas do Caos -->
+          <article class="gameCard gameCard--chaos">
+            <div class="gameCard__icon" aria-hidden="true">🃏</div>
+            <div class="gameCard__title">Cartas do Caos</div>
+            <div class="gameCard__desc">Baralho de cartas que mudam as regras da partida. Regras, desafios, penalidades e bônus aleatórios. O caos decide tudo.</div>
+            <button id="openCartasBtn" class="btn btn--big" type="button">Jogar agora</button>
+          </article>
+
+          <!-- Minigame 8: Duelo de Coragem -->
+          <article class="gameCard gameCard--duel">
+            <div class="gameCard__icon" aria-hidden="true">⚔️</div>
+            <div class="gameCard__title">Duelo de Coragem</div>
+            <div class="gameCard__desc">Dois jogadores sorteados se enfrentam em um desafio 1v1. O grupo vota em quem venceu. Perdedor perde uma vida. Último de pé vence.</div>
+            <button id="openDueloBtn" class="btn btn--big" type="button">Jogar agora</button>
+          </article>
+
+          <!-- Minigame 9: Mestre da Rodada -->
+          <article class="gameCard gameCard--master">
+            <div class="gameCard__icon" aria-hidden="true">👑</div>
+            <div class="gameCard__title">Mestre da Rodada</div>
+            <div class="gameCard__desc">Cada rodada um jogador vira Mestre e sorteia uma regra secreta. Quem quebrar a regra perde uma vida. Turno passa para o próximo.</div>
+            <button id="openMestreBtn" class="btn btn--big" type="button">Jogar agora</button>
           </article>
         </div>
       </div>
@@ -860,11 +899,391 @@
     <!-- Toast notifications -->
     <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
+    <!-- ═══════════ VERDADE OU CAOS ═══════════ -->
+    <section id="screenVerdade" class="screen" aria-label="Verdade ou Caos">
+      <div class="vc-app">
+        <header class="topbar">
+          <div class="brand">
+            <div class="brand__title">Verdade ou Caos</div>
+            <div class="brand__subtitle">Divertex • Verdade honesta ou desafio caótico.</div>
+          </div>
+          <div class="topbar__controls">
+            <button id="vcBackMenuBtn" class="btn btn--ghost" type="button">Voltar ao menu</button>
+          </div>
+        </header>
+
+        <!-- Setup -->
+        <div id="vcSetup" class="vc-phase">
+          <div class="vc-setup-grid">
+            <div class="card">
+              <div class="panel__title">Jogadores</div>
+              <form id="vcPlayerForm" autocomplete="off">
+                <div class="vc-form-row">
+                  <input id="vcNameInput" class="input" type="text" placeholder="Nome do jogador" maxlength="20" required />
+                  <button class="btn" type="submit">+</button>
+                </div>
+              </form>
+              <div id="vcPlayersList" class="vc-chips-list"></div>
+              <p class="vc-player-info">Cada jogador começa com <strong>3 ❤️</strong>. Recusar = perde 1 vida. 0 vidas = eliminado.</p>
+            </div>
+            <div class="card">
+              <div class="panel__title">Como jogar</div>
+              <div class="vc-setup-rules">
+                <div class="vc-rule-item">🎭 Na sua vez: escolha <strong>Verdade</strong> ou <strong>Caos</strong></div>
+                <div class="vc-rule-item">💬 Verdade: responda a pergunta honestamente</div>
+                <div class="vc-rule-item">🔥 Caos: cumpra o desafio ou sofra a consequência</div>
+                <div class="vc-rule-item">😅 Recusou ou não cumpriu: perde 1 ❤️</div>
+                <div class="vc-rule-item">💀 0 ❤️ = eliminado da rodada</div>
+                <div class="vc-rule-item">🏆 Último de pé vence!</div>
+              </div>
+              <div style="margin-top:20px">
+                <button id="vcStartBtn" class="btn btn--big" type="button" disabled style="width:100%">Começar jogo</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Turn -->
+        <div id="vcTurn" class="vc-phase" hidden>
+          <div class="vc-turn-wrap">
+            <div class="card vc-turn-card">
+              <div class="vc-turn-header">
+                <div class="vc-turn-label">É a vez de</div>
+                <div class="vc-turn-player" id="vcTurnPlayer"></div>
+                <div class="vc-turn-lives" id="vcTurnLives"></div>
+              </div>
+              <div id="vcChoiceRow" class="vc-choice-row">
+                <button id="vcTruthBtn" class="vc-choice-btn vc-choice-btn--truth" type="button">
+                  <span class="vc-choice-icon">💬</span>
+                  <span>Verdade</span>
+                </button>
+                <button id="vcDareBtn" class="vc-choice-btn vc-choice-btn--dare" type="button">
+                  <span class="vc-choice-icon">🔥</span>
+                  <span>Caos</span>
+                </button>
+              </div>
+              <div id="vcContentCard" class="vc-content-card" hidden>
+                <div id="vcContentType" class="vc-content-type"></div>
+                <div id="vcContentText" class="vc-content-text"></div>
+              </div>
+              <div id="vcActionRow" class="vc-action-row" hidden>
+                <button id="vcDoneBtn" class="btn btn--success" type="button">✓ Cumpriu / Respondeu</button>
+                <button id="vcRefusedBtn" class="btn btn--danger" type="button">✗ Recusou / Falhou</button>
+              </div>
+            </div>
+            <div class="card vc-scoreboard-card">
+              <div class="panel__title">Placar</div>
+              <div id="vcScoreBoard" class="vc-scoreboard"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Final -->
+        <div id="vcFinal" class="vc-phase" hidden>
+          <div class="vc-final-wrap">
+            <div class="card vc-final-card">
+              <div class="vc-final-trophy">🏆</div>
+              <div class="vc-final-label">Campeão!</div>
+              <div class="vc-final-winner" id="vcFinalWinner"></div>
+              <div class="vc-final-sub">O último sobrevivente do caos</div>
+              <div id="vcFinalScores" class="vc-final-scores"></div>
+              <div class="vc-final-actions">
+                <button id="vcPlayAgainBtn" class="btn btn--big" type="button">Jogar novamente</button>
+                <button id="vcBackMenuFinalBtn" class="btn btn--ghost" type="button">Voltar ao menu</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════ CARTAS DO CAOS ═══════════ -->
+    <section id="screenCartas" class="screen" aria-label="Cartas do Caos">
+      <div class="cc-app">
+        <header class="topbar">
+          <div class="brand">
+            <div class="brand__title">Cartas do Caos</div>
+            <div class="brand__subtitle">Divertex • O baralho decide. Ninguém escapa.</div>
+          </div>
+          <div class="topbar__controls">
+            <button id="ccBackMenuBtn" class="btn btn--ghost" type="button">Voltar ao menu</button>
+          </div>
+        </header>
+
+        <!-- Setup -->
+        <div id="ccSetup" class="cc-phase">
+          <div class="cc-setup-grid">
+            <div class="card">
+              <div class="panel__title">Jogadores</div>
+              <form id="ccPlayerForm" autocomplete="off">
+                <div class="cc-form-row">
+                  <input id="ccNameInput" class="input" type="text" placeholder="Nome do jogador" maxlength="20" required />
+                  <button class="btn" type="submit">+</button>
+                </div>
+              </form>
+              <div id="ccPlayersList" class="cc-chips-list"></div>
+              <p class="cc-player-info">Cada jogador começa com <strong>3 ❤️</strong>. Cartas perigosas custam vidas. Bônus podem salvar.</p>
+            </div>
+            <div class="card">
+              <div class="panel__title">Como jogar</div>
+              <div class="cc-setup-rules">
+                <div class="cc-rule-item">🃏 Cada rodada um jogador vira uma carta</div>
+                <div class="cc-rule-item">🔥 Desafio: cumpra ou perde 1 ❤️</div>
+                <div class="cc-rule-item">📜 Regra: nova lei até a próxima carta</div>
+                <div class="cc-rule-item">❓ Pergunta: responda ou perde 1 ❤️</div>
+                <div class="cc-rule-item">💀 Penalidade: efeito direto</div>
+                <div class="cc-rule-item">🌟 Bônus: ganhe +1 ❤️</div>
+                <div class="cc-rule-item">🏆 Último de pé vence</div>
+              </div>
+              <div style="margin-top:20px">
+                <button id="ccStartBtn" class="btn btn--big" type="button" disabled style="width:100%">Começar jogo</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Play -->
+        <div id="ccPlay" class="cc-phase" hidden>
+          <div class="cc-play-wrap">
+            <div class="card cc-card-stage">
+              <div class="cc-round-badge" id="ccRoundBadge">Rodada 1</div>
+              <div class="cc-player-turn" style="font-size:14px;color:var(--muted);margin-bottom:8px">Vez de <strong id="ccCurrentPlayer"></strong></div>
+              <div id="ccCardDisplay" class="cc-card cc-card--hidden" style="cursor:pointer">
+                <div class="cc-card__icon">🃏</div>
+                <div class="cc-card__text">Clique para virar a carta</div>
+              </div>
+              <div id="ccActions" class="cc-actions" hidden>
+                <button id="ccDoneBtn" class="btn btn--success" type="button">✓ Resolvido</button>
+                <button id="ccFailBtn" class="btn btn--danger" type="button">✗ Não cumpriu (-1 ❤️)</button>
+                <button id="ccBonusBtn" class="btn btn--ghost btn--sm" type="button" hidden>🌟 Ganhou +1 ❤️</button>
+              </div>
+            </div>
+            <div class="card">
+              <div class="panel__title">Placar</div>
+              <div id="ccScoreBoard" class="cc-scoreboard"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Final -->
+        <div id="ccFinal" class="cc-phase" hidden>
+          <div class="cc-final-wrap">
+            <div class="card cc-final-card">
+              <div class="cc-final-trophy">🏆</div>
+              <div class="cc-final-label">Sobrevivente do Caos!</div>
+              <div class="cc-final-winner" id="ccFinalWinner"></div>
+              <div class="cc-final-sub">O único que sobrou do baralho do caos</div>
+              <div id="ccFinalScores" class="cc-final-scores"></div>
+              <div class="cc-final-actions">
+                <button id="ccPlayAgainBtn" class="btn btn--big" type="button">Jogar novamente</button>
+                <button id="ccBackMenuFinalBtn" class="btn btn--ghost" type="button">Voltar ao menu</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════ DUELO DE CORAGEM ═══════════ -->
+    <section id="screenDuelo" class="screen" aria-label="Duelo de Coragem">
+      <div class="dc-app">
+        <header class="topbar">
+          <div class="brand">
+            <div class="brand__title">Duelo de Coragem</div>
+            <div class="brand__subtitle">Divertex • Dois entram. Um perde.</div>
+          </div>
+          <div class="topbar__controls">
+            <button id="dcBackMenuBtn" class="btn btn--ghost" type="button">Voltar ao menu</button>
+          </div>
+        </header>
+
+        <!-- Setup -->
+        <div id="dcSetup" class="dc-phase">
+          <div class="dc-setup-grid">
+            <div class="card">
+              <div class="panel__title">Jogadores</div>
+              <form id="dcPlayerForm" autocomplete="off">
+                <div class="dc-form-row">
+                  <input id="dcNameInput" class="input" type="text" placeholder="Nome do jogador" maxlength="20" required />
+                  <button class="btn" type="submit">+</button>
+                </div>
+              </form>
+              <div id="dcPlayersList" class="dc-chips-list"></div>
+              <p class="dc-player-info">Cada jogador começa com <strong>3 ❤️</strong>. O grupo vota no perdedor. 0 vidas = eliminado.</p>
+            </div>
+            <div class="card">
+              <div class="panel__title">Como jogar</div>
+              <div class="dc-setup-rules">
+                <div class="dc-rule-item">⚔️ Dois jogadores são sorteados para duelar</div>
+                <div class="dc-rule-item">🎯 Um desafio 1v1 é revelado</div>
+                <div class="dc-rule-item">🗳️ O grupo vota em quem perdeu o duelo</div>
+                <div class="dc-rule-item">❤️ O perdedor perde 1 vida</div>
+                <div class="dc-rule-item">💀 0 vidas = eliminado</div>
+                <div class="dc-rule-item">🏆 Último de pé vence!</div>
+              </div>
+              <div style="margin-top:20px">
+                <button id="dcStartBtn" class="btn btn--big" type="button" disabled style="width:100%">Começar jogo</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Duel -->
+        <div id="dcDuel" class="dc-phase" hidden>
+          <div class="dc-duel-wrap">
+            <div class="card dc-duel-card">
+              <div class="dc-round-badge" id="dcRoundBadge">Rodada 1</div>
+              <div class="dc-vs-row">
+                <div class="dc-fighter dc-fighter--left">
+                  <div class="dc-fighter__lives" id="dcFighter1Lives"></div>
+                  <div class="dc-fighter__name" id="dcFighter1Name"></div>
+                </div>
+                <div class="dc-vs-label">VS</div>
+                <div class="dc-fighter dc-fighter--right">
+                  <div class="dc-fighter__lives" id="dcFighter2Lives"></div>
+                  <div class="dc-fighter__name" id="dcFighter2Name"></div>
+                </div>
+              </div>
+              <div id="dcChallengeBox" class="dc-challenge-box"></div>
+              <div id="dcVoteSection" hidden>
+                <div class="dc-vote-label">🗳️ Quem perdeu o duelo?</div>
+                <div class="dc-vote-row" id="dcVoteRow"></div>
+                <div class="dc-reveal-btn-row">
+                  <button id="dcRevealBtn" class="btn btn--big" type="button" disabled>⚖️ Revelar resultado</button>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="panel__title">Placar</div>
+              <div id="dcScoreBoard" class="dc-scoreboard"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Final -->
+        <div id="dcFinal" class="dc-phase" hidden>
+          <div class="dc-final-wrap">
+            <div class="card dc-final-card">
+              <div class="dc-final-trophy">🏆</div>
+              <div class="dc-final-label">Campeão dos Duelos!</div>
+              <div class="dc-final-winner" id="dcFinalWinner"></div>
+              <div class="dc-final-sub">O único que sobreviveu a todos os duelos</div>
+              <div id="dcFinalScores" class="dc-final-scores"></div>
+              <div class="dc-final-actions">
+                <button id="dcPlayAgainBtn" class="btn btn--big" type="button">Jogar novamente</button>
+                <button id="dcBackMenuFinalBtn" class="btn btn--ghost" type="button">Voltar ao menu</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════ MESTRE DA RODADA ═══════════ -->
+    <section id="screenMestre" class="screen" aria-label="Mestre da Rodada">
+      <div class="mr-app">
+        <header class="topbar">
+          <div class="brand">
+            <div class="brand__title">Mestre da Rodada</div>
+            <div class="brand__subtitle">Divertex • Sorteie a regra. Imponha a lei. Vença.</div>
+          </div>
+          <div class="topbar__controls">
+            <button id="mrBackMenuBtn" class="btn btn--ghost" type="button">Voltar ao menu</button>
+          </div>
+        </header>
+
+        <!-- Setup -->
+        <div id="mrSetup" class="mr-phase">
+          <div class="mr-setup-grid">
+            <div class="card">
+              <div class="panel__title">Jogadores</div>
+              <form id="mrPlayerForm" autocomplete="off">
+                <div class="mr-form-row">
+                  <input id="mrNameInput" class="input" type="text" placeholder="Nome do jogador" maxlength="20" required />
+                  <button class="btn" type="submit">+</button>
+                </div>
+              </form>
+              <div id="mrPlayersList" class="mr-chips-list"></div>
+              <p class="mr-player-info">Cada jogador começa com <strong>3 ❤️</strong>. Quem quebrar a regra perde 1 vida.</p>
+            </div>
+            <div class="card">
+              <div class="panel__title">Como jogar</div>
+              <div class="mr-setup-rules">
+                <div class="mr-rule-item">👑 Um jogador é o Mestre da rodada</div>
+                <div class="mr-rule-item">📜 O Mestre sorteia uma regra secreta</div>
+                <div class="mr-rule-item">🤫 Mestre revela a regra para todos</div>
+                <div class="mr-rule-item">🎮 Todos devem obedecer a regra</div>
+                <div class="mr-rule-item">👆 Mestre aponta quem quebrou a regra</div>
+                <div class="mr-rule-item">❤️ Quem quebrou a regra perde 1 vida</div>
+                <div class="mr-rule-item">🏆 Último de pé vence!</div>
+              </div>
+              <div style="margin-top:20px">
+                <button id="mrStartBtn" class="btn btn--big" type="button" disabled style="width:100%">Começar jogo</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Master Phase -->
+        <div id="mrMaster" class="mr-phase" hidden>
+          <div class="mr-master-wrap">
+            <div class="card mr-master-card">
+              <div class="mr-round-badge" id="mrRoundBadge">Rodada 1</div>
+              <div class="mr-crown">👑</div>
+              <div class="mr-master-label">Mestre desta rodada</div>
+              <div class="mr-master-name" id="mrMasterName"></div>
+              <div id="mrRuleReveal" class="mr-rule-reveal" style="cursor:pointer">
+                <div class="mr-rule-hidden-hint">Clique para revelar a regra secreta</div>
+                <div id="mrRuleContent" hidden>
+                  <div class="mr-rule-type">REGRA DA RODADA</div>
+                  <div class="mr-rule-text" id="mrRuleText"></div>
+                  <div class="mr-reveal-hint">Leia em voz alta para todos!</div>
+                </div>
+              </div>
+              <div id="mrVoteSection" class="mr-vote-section" hidden>
+                <div class="mr-vote-label">👑 Quem quebrou a regra? (Mestre decide ou grupo vota)</div>
+                <div id="mrVoteGrid" class="mr-vote-grid"></div>
+                <div class="mr-vote-actions">
+                  <button id="mrNoOneBtn" class="btn btn--ghost" type="button">✅ Ninguém quebrou</button>
+                  <button id="mrNextRoundBtn" class="btn btn--big" type="button" disabled>Próxima rodada →</button>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="panel__title">Placar</div>
+              <div id="mrScoreBoard" class="mr-scoreboard"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Final -->
+        <div id="mrFinal" class="mr-phase" hidden>
+          <div class="mr-final-wrap">
+            <div class="card mr-final-card">
+              <div class="mr-final-trophy">👑</div>
+              <div class="mr-final-label">Mestre Supremo!</div>
+              <div class="mr-final-winner" id="mrFinalWinner"></div>
+              <div class="mr-final-sub">O único que nunca quebrou nenhuma regra</div>
+              <div id="mrFinalScores" class="mr-final-scores"></div>
+              <div class="mr-final-actions">
+                <button id="mrPlayAgainBtn" class="btn btn--big" type="button">Jogar novamente</button>
+                <button id="mrBackMenuFinalBtn" class="btn btn--ghost" type="button">Voltar ao menu</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <script type="module" src="./app.js"></script>
     <script type="module" src="./js/supabase-integration.js"></script>
     <script type="module" src="./js/likely-game.js"></script>
     <script type="module" src="./js/letters-game.js"></script>
     <script type="module" src="./js/numbers-game.js"></script>
     <script type="module" src="./js/names-wheel.js"></script>
+    <script type="module" src="./js/verdade-ou-caos.js"></script>
+    <script type="module" src="./js/cartas-do-caos.js"></script>
+    <script type="module" src="./js/duelo-de-coragem.js"></script>
+    <script type="module" src="./js/mestre-da-rodada.js"></script>
   </body>
 </html>

@@ -4,7 +4,8 @@ const AUTH_ERRORS = {
   'Invalid login credentials':                          'E-mail ou senha incorretos.',
   'Email not confirmed':                                'E-mail não confirmado. Verifique sua caixa de entrada.',
   'User already registered':                            'Este e-mail já está cadastrado.',
-  'Password should be at least 6 characters':           'A senha deve ter pelo menos 6 caracteres.',
+  'Password should be at least 6 characters':           'A senha deve ter pelo menos 8 caracteres.',
+  'Password should be at least 8 characters':           'A senha deve ter pelo menos 8 caracteres.',
   'New password should be different from the old password': 'A nova senha deve ser diferente da atual.',
   'Token has expired or is invalid':                    'Link expirado ou inválido. Solicite um novo.',
   'Email rate limit exceeded':                          'Muitas tentativas. Aguarde antes de tentar novamente.',
@@ -78,7 +79,10 @@ export async function signInWithGoogle() {
 
   const { error } = await sb.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: window.location.origin },
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback`,
+      queryParams: { access_type: 'offline', prompt: 'consent' },
+    },
   });
   if (error) return { error: translateError(error.message) };
   return {};

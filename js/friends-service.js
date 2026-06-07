@@ -79,7 +79,7 @@ export async function listFriends() {
 
   return data.map(f => ({
     friendshipId: f.id,
-    profile: f.requester_id === userId ? f.addressee : f.requester,
+    profile: f.requester?.id === userId ? f.addressee : f.requester,
     since: f.created_at,
   }));
 }
