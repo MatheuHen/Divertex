@@ -9,7 +9,7 @@
  */
 
 import { isReady, getClient } from './supabase-client.js';
-import { onAuthStateChange, getProfile, signOut } from './auth-service.js';
+import { onAuthStateChange, getProfile, getSession, signOut } from './auth-service.js';
 import { saveSession, saveRound, submitGameStats } from './game-service.js';
 import { getGlobalRanking } from './ranking-service.js';
 import { renderAuthPanel, updateAuthPanel, renderAuthGate, renderPasswordResetGate } from './auth-ui.js';
@@ -31,6 +31,10 @@ let _pkceInProgress = false;
 // redefinição de senha — evita que o gate feche antes de salvar a nova senha.
 let _recoveryMode = false;
 
+// Garante que a sessão só seja "tratada" uma vez (evita corrida entre o
+// callback PKCE explícito e o evento SIGNED_IN do onAuthStateChange).
+let _sessionHandled = false;
+
 // Perfil global — lido por likely-game.js e outros minigames
 window.DivertexUser = null;
 
@@ -49,19 +53,81 @@ function hideAuthGate() {
   if (menu) menu.classList.add('screen--active');
 }
 
+// Garante que o perfil exista. O trigger handle_new_user normalmente já o cria,
+// mas isto é uma rede de segurança para contas antigas ou casos de borda.
+async function _ensureProfile(user) {
+  const sb = getClient();
+  if (!sb) return null;
+  const name = user.user_metadata?.full_name
+    || user.user_metadata?.name
+    || user.email?.split('@')[0]
+    || 'Jogador';
+  // RLS profiles_insert_own permite inserir quando auth.uid() = id.
+  // O trigger on_profile_created cria player_stats automaticamente.
+  const { error } = await sb
+    .from('profiles')
+    .upsert({ id: user.id, display_name: name }, { onConflict: 'id', ignoreDuplicates: true });
+  if (error) console.warn('[AUTH] ensure profile upsert falhou:', error.message);
+  return getProfile(user.id);
+}
+
+// Trata a sessão autenticada. Idempotente (guard _sessionHandled).
+// IMPORTANTE: nunca é chamada de dentro do callback de onAuthStateChange sem
+// setTimeout — chamadas async do Supabase dentro daquele callback travam o
+// lock interno do GoTrue e congelam o app ("Verificando…" infinito).
 async function _handleSession(session) {
+  if (!session?.user) return;
+  if (_sessionHandled) {
+    console.log('[AUTH] sessão já tratada — ignorando duplicata');
+    return;
+  }
+  _sessionHandled = true;
   currentSession = session;
-  const profile = await getProfile(session.user.id);
-  updateAuthPanel({ session, profile });
-  await renderGlobalRanking();
-  hideAuthGate();
+  console.log('[AUTH] auth state set: authenticated');
+
+  // 1) Estado mínimo definido IMEDIATAMENTE — não depende da rede.
+  const fallbackName = session.user.user_metadata?.full_name
+    || session.user.email?.split('@')[0]
+    || 'Jogador';
   window.DivertexUser = {
     id: session.user.id,
-    name: profile?.display_name || session.user.email?.split('@')[0] || 'Jogador',
-    avatar: profile?.avatar_url || null,
+    name: fallbackName,
+    avatar: session.user.user_metadata?.avatar_url || null,
   };
-  _showFriendsBtn(true);
   if (getApp()) getApp().currentUser = { id: session.user.id };
+  console.log('[AUTH] DivertexUser set');
+
+  // 2) Fecha o gate AGORA — entrar no app nunca pode depender da rede.
+  hideAuthGate();
+  _showFriendsBtn(true);
+  console.log('[AUTH] overlay removed');
+
+  // 3) Perfil + ranking de forma resiliente (não bloqueia a entrada).
+  let profile = null;
+  try {
+    console.log('[AUTH] ensure profile started');
+    profile = await getProfile(session.user.id);
+    if (!profile) {
+      console.warn('[AUTH] profile ausente — garantindo criação');
+      profile = await _ensureProfile(session.user);
+    }
+    console.log('[AUTH] ensure profile success:', Boolean(profile));
+  } catch (e) {
+    console.error('[AUTH] ensure profile error:', e);
+  }
+
+  if (profile) {
+    window.DivertexUser.name = profile.display_name || fallbackName;
+    window.DivertexUser.avatar = profile.avatar_url || window.DivertexUser.avatar;
+  }
+  updateAuthPanel({ session, profile });
+
+  try {
+    await renderGlobalRanking();
+  } catch (e) {
+    console.error('[AUTH] ranking error:', e);
+  }
+  console.log('[AUTH] final state: ready');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -72,87 +138,75 @@ async function _handlePkceCallback() {
   const card = document.getElementById('authGateCard');
   if (card) card.innerHTML = '<div class="authGate__loading">Verificando…</div>';
 
-  console.log('[AUTH CALLBACK] iniciado');
+  console.log('[AUTH] callback detected; path:', window.location.pathname);
 
   const code = new URLSearchParams(window.location.search).get('code');
 
+  // Sem code: pode ser /auth/callback acessado direto. Se já houver sessão, o
+  // listener fecha o gate; senão mostramos o login.
   if (!code) {
-    console.log('[AUTH CALLBACK] sem code na URL — mostrando login');
+    console.log('[AUTH] callback sem code');
     _pkceInProgress = false;
-    renderAuthGate();
+    window.history.replaceState({}, document.title, '/');
+    if (!_sessionHandled) {
+      const existing = await getSession().catch(() => null);
+      if (existing) _handleSession(existing);
+      else renderAuthGate();
+    }
     return;
   }
 
-  console.log('[AUTH CALLBACK] code encontrado');
+  console.log('[AUTH] code found');
 
-  // Timeout de segurança: se exchange travar, mostrar erro após 12s
+  // Timeout de segurança (10s): se o exchange travar, mostra erro amigável.
   const failTimer = setTimeout(() => {
-    console.warn('[AUTH CALLBACK] timeout atingido — mostrando erro');
+    console.warn('[AUTH] timeout reached');
     _pkceInProgress = false;
-    if (!currentSession && !_recoveryMode) {
-      _showCallbackError(card);
-    }
-  }, 12000);
+    if (!_sessionHandled && !_recoveryMode) _showCallbackError(card);
+  }, 10000);
 
   try {
     const sb = getClient();
-    console.log('[AUTH CALLBACK] exchange iniciado');
+    console.log('[AUTH] exchangeCodeForSession started');
 
     const { data, error } = await sb.auth.exchangeCodeForSession(code);
     clearTimeout(failTimer);
 
-    console.log('[AUTH CALLBACK] exchange finalizado');
-
-    // Limpa ?code= da URL imediatamente para evitar re-use se o usuário atualizar
-    window.history.replaceState({}, document.title, window.location.pathname);
+    // Limpa ?code= da URL imediatamente para evitar reuso ao atualizar.
+    window.history.replaceState({}, document.title, '/');
 
     if (error) {
-      console.error('[AUTH CALLBACK] erro no exchange:', error.message);
-      // Mantém _pkceInProgress = true para que INITIAL_SESSION(null) não sobrescreva
-      // o card de erro — só reseta quando o usuário clicar em retry/voltar
-      if (!currentSession && !_recoveryMode) {
-        _showCallbackError(card, error.message);
-      } else {
-        _pkceInProgress = false;
-      }
+      console.error('[AUTH] exchangeCodeForSession error:', error.message);
+      _pkceInProgress = false;
+      if (!_sessionHandled && !_recoveryMode) _showCallbackError(card, error.message);
       return;
     }
 
-    // Aguarda um tick para que onAuthStateChange processe PASSWORD_RECOVERY
-    // antes de decidirmos se isso é um login normal ou fluxo de recovery
-    await new Promise(r => setTimeout(r, 150));
-
+    console.log('[AUTH] exchangeCodeForSession success');
     _pkceInProgress = false;
 
+    // Recovery via PKCE: o listener disparou PASSWORD_RECOVERY e já mostrou o form.
     if (_recoveryMode) {
-      // onAuthStateChange já disparou PASSWORD_RECOVERY e exibiu o form de nova senha
-      console.log('[AUTH CALLBACK] modo recovery ativo — form de senha já exibido');
+      console.log('[AUTH] modo recovery ativo — form de senha exibido');
       return;
     }
 
-    if (currentSession) {
-      // onAuthStateChange já disparou SIGNED_IN e chamou _handleSession
-      console.log('[AUTH CALLBACK] sessão tratada pelo listener — gate já fechado');
-      return;
-    }
-
-    // Fallback direto: onAuthStateChange não disparou a tempo, usamos data.session
+    // Trata a sessão diretamente (o guard _sessionHandled evita duplicar com o
+    // evento SIGNED_IN que o listener também receberá).
     if (data?.session) {
-      console.log('[AUTH CALLBACK] sessão encontrada via data — inicializando');
-      await _handleSession(data.session);
-      console.log('[AUTH CALLBACK] redirecionando para menu');
+      console.log('[AUTH] getSession result: sessão via exchange');
+      _handleSession(data.session);
     } else {
-      console.log('[AUTH CALLBACK] sem sessão após exchange — mostrando login');
-      renderAuthGate();
+      const session = await getSession().catch(() => null);
+      console.log('[AUTH] getSession result:', Boolean(session));
+      if (session) _handleSession(session);
+      else if (!_sessionHandled) renderAuthGate();
     }
-
   } catch (e) {
     clearTimeout(failTimer);
     _pkceInProgress = false;
-    console.error('[AUTH CALLBACK] exceção:', e);
-    if (!currentSession && !_recoveryMode) {
-      _showCallbackError(card, e?.message);
-    }
+    console.error('[AUTH] callback exception:', e);
+    if (!_sessionHandled && !_recoveryMode) _showCallbackError(card, e?.message);
   }
 }
 
@@ -192,6 +246,9 @@ function _showCallbackError(card, detail) {
 // Inicialização principal
 // ─────────────────────────────────────────────────────────────────────────────
 async function init() {
+  console.log('[AUTH] init started | path:', window.location.pathname,
+    '| recovery:', _RECOVERY_ON_LOAD, '| pkce:', _PKCE_ON_LOAD);
+
   if (!isReady()) {
     console.log('[Divertex] Supabase não configurado — modo local ativo.');
     hideAuthGate();
@@ -214,7 +271,14 @@ async function init() {
     renderGlobalRanking();
   }
 
-  onAuthStateChange(async (event, session) => {
+  // ATENÇÃO: este callback NÃO pode ser async nem chamar funções async do
+  // Supabase diretamente. O GoTrue mantém um lock interno enquanto emite o
+  // evento; um `await sb.from(...)` aqui dentro espera o mesmo lock e congela
+  // o app ("Verificando…" infinito). Toda chamada de rede roda via setTimeout,
+  // que devolve o controle e libera o lock antes de executar.
+  onAuthStateChange((event, session) => {
+    console.log('[AUTH] event:', event, '| hasSession:', Boolean(session));
+
     // PASSWORD_RECOVERY: link de recovery clicado (implicit ou PKCE)
     if (event === 'PASSWORD_RECOVERY') {
       _recoveryMode = true;
@@ -242,8 +306,10 @@ async function init() {
 
     if (session) {
       _pkceInProgress = false; // exchange concluído via evento
-      await _handleSession(session);
+      // Deferido para fora do lock do GoTrue (correção do deadlock).
+      setTimeout(() => { _handleSession(session); }, 0);
     } else {
+      _sessionHandled = false;
       updateAuthPanel(null);
       currentSessionId = null;
       window.DivertexUser = null;
