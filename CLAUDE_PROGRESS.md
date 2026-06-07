@@ -1,6 +1,6 @@
 # CLAUDE_PROGRESS.md — Divertex
 
-**Atualizado em:** 2026-05-30  
+**Atualizado em:** 2026-06-07  
 **Status geral:** PRODUÇÃO ATIVA ✅  
 **URL pública:** https://divertex-kappa.vercel.app  
 **GitHub:** https://github.com/MatheuHen/Divertex  
@@ -294,9 +294,37 @@ Sessão bateu o limite de tokens antes de concluir. O prompt completo foi escrit
 
 ---
 
-## 11. Próximo passo exato
+## 11. Estado atual (2026-06-07)
 
-**Todos os 3 minigames implementados e banco corrigido.** Próximo: novas features ou melhorias.
+**9 minigames implementados.** Auth SaaS completo com Google OAuth. Banco 100% corrigido.
+
+### Minigames implementados
+| Minigame | Status |
+|----------|--------|
+| Roleta de Vidas | ✅ |
+| Quem é Mais Provável | ✅ |
+| Sorteador de Letras | ✅ |
+| Sorteador de Números | ✅ |
+| Sorteador de Nomes | ✅ |
+| Verdade ou Caos | ✅ (2026-06-07) |
+| Cartas do Caos | ✅ (2026-06-07) |
+| Duelo de Coragem | ✅ (2026-06-07) |
+| Mestre da Rodada | ✅ (2026-06-07) |
+
+### Auth SaaS
+| Feature | Status |
+|---------|--------|
+| Login e-mail/senha | ✅ |
+| Cadastro e-mail/senha | ✅ |
+| **Login com Google (OAuth PKCE)** | ✅ (2026-06-07) |
+| Recuperação de senha | ✅ |
+| Sessão persistente | ✅ |
+| Perfil automático pós-signup | ✅ |
+
+### Segurança banco (migrations 001-005 aplicadas)
+- RLS em 5 tabelas ✅
+- SECURITY DEFINER warnings corrigidos (migration 005) ✅
+- increment_player_stats: SECURITY INVOKER ✅
 
 ---
 
