@@ -16,7 +16,7 @@ export function getClient() {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: true,
+      detectSessionInUrl: false, // Troca do code=PKCE feita explicitamente em supabase-integration.js
       flowType: 'pkce',
     },
   });
