@@ -204,6 +204,15 @@ async function init() {
   showAuthGate();
 
   if (_recoveryMode) {
+    // Fluxo de redefinição de senha. Em PKCE o link volta como ?code= e a sessão
+    // de recuperação precisa ser estabelecida (updateUser exige sessão), mas SEM
+    // cair na home: _handlePkceCallback respeita _recoveryMode e não chama
+    // _handleSession. Trocamos o code ANTES de renderPasswordResetGate porque ele
+    // limpa a query string (e com ela o ?code=) da URL.
+    if (_PKCE_ON_LOAD) {
+      _pkceInProgress = true;
+      _handlePkceCallback();
+    }
     renderPasswordResetGate();
   } else if (_PKCE_ON_LOAD) {
     _pkceInProgress = true;

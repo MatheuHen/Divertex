@@ -54,8 +54,11 @@ export async function resetPassword({ email }) {
   const sb = getClient();
   if (!sb) return { error: 'Supabase não configurado.' };
 
+  // ?type=recovery marca o retorno como redefinição de senha. No fluxo PKCE o
+  // link volta como ?code= (igual a um login normal) — sem esse marcador o app
+  // não consegue distinguir recuperação de login e cai direto na home.
   const { error } = await sb.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin,
+    redirectTo: window.location.origin + '/?type=recovery',
   });
 
   if (error) return { error: translateError(error.message) };

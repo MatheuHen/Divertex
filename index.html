@@ -25,12 +25,16 @@
       try {
         var _h = window.location.hash;
         var _q = window.location.search;
-        // Implicit flow: hash contém type=recovery
+        var _hp = new URLSearchParams((_h || '').replace(/^#/, ''));
+        var _qp = new URLSearchParams(_q || '');
+        // Recovery chega como #type=recovery (implicit) OU ?type=recovery (PKCE,
+        // marcado no redirectTo de resetPasswordForEmail). Sem checar a query,
+        // o link PKCE seria tratado como login normal e cairia na home.
         window.__DIVERTEX_RECOVERY = Boolean(
-          _h && new URLSearchParams(_h.replace(/^#/, '')).get('type') === 'recovery'
+          _hp.get('type') === 'recovery' || _qp.get('type') === 'recovery'
         );
         // PKCE flow: query string contém code= (troca assíncrona — aguardar onAuthStateChange)
-        window.__DIVERTEX_PKCE = Boolean(_q && new URLSearchParams(_q).get('code'));
+        window.__DIVERTEX_PKCE = Boolean(_qp.get('code'));
       } catch (e) {
         window.__DIVERTEX_RECOVERY = false;
         window.__DIVERTEX_PKCE = false;
