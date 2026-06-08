@@ -4608,3 +4608,41 @@ body.roomPanel-open { overflow: hidden; }
 
 /* Micro-interacao: feedback de toque */
 .btn--big:active, .btn--google:active { transform: scale(.985); }
+
+/* ── Sincronizacao ao vivo: modo espectador (convidado) ── */
+body.room-spectator .screen--active { pointer-events: none; }
+body.room-spectator { padding-top: 44px; }
+#roomSpectatorBar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 8500;
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  padding: 8px 14px; pointer-events: auto;
+  background: linear-gradient(90deg, rgba(34,230,255,.95), rgba(255,61,242,.95));
+  color: #04121a; font-weight: 800; font-size: 13px;
+  box-shadow: 0 4px 16px var(--shadow);
+}
+#roomSpectatorBar[hidden] { display: none; }
+#roomSpectatorBar .btn { pointer-events: auto; }
+#roomSpectatorBar .btn--ghost { color: #04121a; border-color: rgba(4,18,26,.35); }
+.room-spinflash { animation: spinFlash .5s ease; }
+@keyframes spinFlash { 0% { filter: brightness(1); } 30% { filter: brightness(1.35) saturate(1.3); } 100% { filter: brightness(1); } }
+
+/* ── Botao flutuante de mudo ── */
+.soundToggleFab {
+  position: fixed; left: 16px; bottom: 18px; z-index: 8000;
+  width: 44px; height: 44px; border-radius: 50%; cursor: pointer;
+  border: 1px solid var(--cardBorder); background: var(--bg1); color: var(--text);
+  font-size: 20px; line-height: 1; box-shadow: 0 6px 18px var(--shadow);
+  transition: transform .15s, border-color .15s, background .15s;
+}
+.soundToggleFab:hover { transform: scale(1.08); border-color: var(--accent); background: var(--bg2); }
+.soundToggleFab:active { transform: scale(.92); }
+.soundToggleFab--off { opacity: .6; }
+
+/* ── Avatar com upload no modal de perfil ── */
+.profileModal__avatarBtn { position: relative; border: none; background: none; padding: 0; cursor: pointer; border-radius: 50%; }
+.profileModal__avatarBtn:hover { filter: brightness(1.05); }
+.profileModal__avatarCam {
+  position: absolute; right: -2px; bottom: -2px; width: 24px; height: 24px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 12px;
+  background: var(--accent); color: #04121a; border: 2px solid var(--bg0); box-shadow: 0 2px 6px var(--shadow);
+}

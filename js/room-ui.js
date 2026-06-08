@@ -6,6 +6,7 @@
  */
 
 import Room from './realtime-room.js';
+import { initRoomSync } from './room-sync.js';
 
 // gameKey → id do botão de abertura no menu (reusa a lógica existente do app).
 const GAME_OPEN_BTN = {
@@ -33,6 +34,7 @@ let _pendingJoinCode = null;
 export function initRoomUI() {
   _buildDom();
   _wireRoomEvents();
+  initRoomSync();
 
   // Link de convite ?sala=CODE — guarda para entrar assim que logar.
   const params = new URLSearchParams(location.search);

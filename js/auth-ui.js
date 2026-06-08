@@ -4,7 +4,7 @@
  * Opera via DOM — sem dependência de frameworks.
  */
 
-import { signIn, signUp, resetPassword, updatePassword, signInWithGoogle, updateProfile } from './auth-service.js';
+import { signIn, signUp, resetPassword, updatePassword, signInWithGoogle, updateProfile, uploadAvatar } from './auth-service.js';
 
 const GOOGLE_ICON = `<svg class="google-icon" viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>`;
 
@@ -280,15 +280,19 @@ export function openProfileModal() {
   modal.setAttribute('aria-modal', 'true');
 
   const initial = escHtml((user.name || 'J')[0].toUpperCase());
-  const avatar = user.avatar
-    ? `<img src="${escHtml(user.avatar)}" alt="" class="profileModal__avatar">`
-    : `<div class="profileModal__avatarFallback">${initial}</div>`;
+  let pendingAvatar = null; // url novo enquanto não salva
 
   modal.innerHTML = `
     <div class="modal__box">
       <button id="profileCloseX" class="modal__closeX" type="button" aria-label="Fechar">✕</button>
       <div class="profileModal__head">
-        ${avatar}
+        <button id="profileAvatarBtn" class="profileModal__avatarBtn" type="button" title="Trocar foto">
+          ${user.avatar
+            ? `<img id="profileAvatarImg" src="${escHtml(user.avatar)}" alt="" class="profileModal__avatar">`
+            : `<div id="profileAvatarImg" class="profileModal__avatarFallback">${initial}</div>`}
+          <span class="profileModal__avatarCam">📷</span>
+        </button>
+        <input id="profileAvatarInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
         <div class="modal__title">Seu perfil</div>
       </div>
       <div id="profileError" class="authError" hidden></div>
@@ -296,7 +300,7 @@ export function openProfileModal() {
         <span class="field__label">Nome de exibição</span>
         <input id="profileName" class="input" type="text" maxlength="50" value="${escHtml(user.name || '')}" autocomplete="name" />
       </label>
-      <p class="profileModal__hint">Esse é o nome que aparece para seus amigos e nas salas online.</p>
+      <p class="profileModal__hint">Toque na foto para trocar. Nome e foto aparecem para seus amigos e nas salas online.</p>
       <button id="profileSaveBtn" class="btn btn--big" type="button" style="width:100%">Salvar alterações</button>
     </div>
   `;
@@ -311,15 +315,40 @@ export function openProfileModal() {
   nameInput?.focus();
   nameInput?.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('profileSaveBtn')?.click(); });
 
+  // Upload de avatar
+  const fileInput = document.getElementById('profileAvatarInput');
+  document.getElementById('profileAvatarBtn')?.addEventListener('click', () => fileInput?.click());
+  fileInput?.addEventListener('change', async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    const errEl = document.getElementById('profileError');
+    const camEl = modal.querySelector('.profileModal__avatarCam');
+    if (camEl) camEl.textContent = '⏳';
+    if (errEl) errEl.hidden = true;
+    const res = await uploadAvatar(file);
+    if (res?.error) { showError(errEl, res.error); if (camEl) camEl.textContent = '📷'; window.DivertexSFX?.error(); return; }
+    pendingAvatar = res.url;
+    // preview imediato
+    const head = modal.querySelector('.profileModal__head');
+    const old = document.getElementById('profileAvatarImg');
+    if (old) {
+      const img = document.createElement('img');
+      img.id = 'profileAvatarImg'; img.className = 'profileModal__avatar'; img.src = res.url; img.alt = '';
+      old.replaceWith(img);
+    }
+    if (camEl) camEl.textContent = '✓';
+    window.DivertexSFX?.success();
+  });
+
   document.getElementById('profileSaveBtn')?.addEventListener('click', async () => {
     const btn = document.getElementById('profileSaveBtn');
     const errEl = document.getElementById('profileError');
     const newName = nameInput?.value?.trim();
     if (!newName) { showError(errEl, 'Informe um nome.'); return; }
-    if (newName === user.name) { close(); return; }
+    if (newName === user.name && !pendingAvatar) { close(); return; }
 
     btn.disabled = true; btn.textContent = 'Salvando…'; if (errEl) errEl.hidden = true;
-    const result = await updateProfile({ displayName: newName });
+    const result = await updateProfile({ displayName: newName, avatarUrl: pendingAvatar ?? user.avatar });
     if (result?.error) {
       showError(errEl, result.error);
       btn.disabled = false; btn.textContent = 'Salvar alterações';
@@ -327,8 +356,8 @@ export function openProfileModal() {
       return;
     }
     // Atualiza estado global + UI sem recarregar.
-    window.DivertexUser = { ...user, name: newName };
-    updateAuthPanel({ session: true, profile: { display_name: newName, avatar_url: user.avatar } });
+    window.DivertexUser = { ...user, name: newName, avatar: pendingAvatar ?? user.avatar };
+    updateAuthPanel({ session: true, profile: { display_name: newName, avatar_url: window.DivertexUser.avatar } });
     window.dispatchEvent(new CustomEvent('divertex:user', { detail: window.DivertexUser }));
     window.DivertexSFX?.success();
     btn.textContent = 'Salvo ✓';

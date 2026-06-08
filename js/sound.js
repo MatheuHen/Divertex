@@ -85,4 +85,20 @@ document.addEventListener('pointerdown', (e) => {
 window.addEventListener('divertex:win', () => SFX.win());
 window.addEventListener('divertex:reveal', () => SFX.reveal());
 
+// ─── Botão flutuante de mudo ────────────────────────────────────────────────
+function _buildToggle() {
+  if (document.getElementById('soundToggleFab')) return;
+  const btn = document.createElement('button');
+  btn.id = 'soundToggleFab';
+  btn.className = 'soundToggleFab';
+  btn.type = 'button';
+  btn.setAttribute('aria-label', 'Ativar ou desativar som');
+  const paint = () => { btn.textContent = _muted ? '🔇' : '🔊'; btn.classList.toggle('soundToggleFab--off', _muted); };
+  paint();
+  btn.addEventListener('click', () => { SFX.toggle(); paint(); });
+  document.body.appendChild(btn);
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _buildToggle);
+else _buildToggle();
+
 export default SFX;

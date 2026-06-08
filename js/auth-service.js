@@ -138,6 +138,26 @@ export async function updateProfile({ displayName, avatarUrl }) {
   return {};
 }
 
+// ---- Upload de avatar (Supabase Storage, bucket 'avatars') ----
+export async function uploadAvatar(file) {
+  const sb = getClient();
+  if (!sb) return { error: 'Supabase não configurado.' };
+  if (!file) return { error: 'Nenhum arquivo selecionado.' };
+  if (file.size > 2 * 1024 * 1024) return { error: 'Imagem muito grande (máx. 2 MB).' };
+
+  const session = await getSession();
+  if (!session) return { error: 'Não autenticado.' };
+
+  const ext = (file.name?.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
+  const path = `${session.user.id}/avatar_${Date.now()}.${ext}`;
+
+  const { error } = await sb.storage.from('avatars').upload(path, file, { upsert: true, cacheControl: '3600' });
+  if (error) return { error: translateError(error.message) };
+
+  const { data } = sb.storage.from('avatars').getPublicUrl(path);
+  return { url: data.publicUrl };
+}
+
 // ---- Atualizar senha (usado após PASSWORD_RECOVERY) ----
 export async function updatePassword(newPassword) {
   const sb = getClient();
