@@ -187,6 +187,14 @@ const FUNNY_MSGS = [
     renderSetup();
   });
 
+  // Sala online: preenche o elenco compartilhado.
+  window.addEventListener('divertex:roster', e => {
+    if (e.detail?.game !== 'likely') return;
+    state.players = (e.detail.players || []).slice(0, 8)
+      .map(name => ({ name, lives: LIVES, eliminated: false, isMe: window.DivertexUser?.name === name }));
+    renderSetup();
+  });
+
   $('likelyAddSampleBtn')?.addEventListener('click', () => {
     ['Ana', 'Bruno', 'Carol', 'Diego', 'Elena'].forEach(name => {
       if (state.players.length < 8 && !state.players.find(p => p.name === name))

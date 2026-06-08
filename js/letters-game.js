@@ -424,6 +424,14 @@ const CATEGORY_LABELS = {
     renderSetup();
   });
 
+  // Sala online: preenche o elenco compartilhado.
+  window.addEventListener('divertex:roster', e => {
+    if (e.detail?.game !== 'letters') return;
+    state.players = (e.detail.players || []).slice(0, 8)
+      .map(name => ({ name, lives: LIVES, eliminated: false }));
+    renderSetup();
+  });
+
   $('lgStartBtn')?.addEventListener('click', startGame);
 
   $('lgBackMenuBtn')?.addEventListener('click', goToMenu);

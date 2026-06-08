@@ -268,6 +268,14 @@ import { submitGameStats } from './game-service.js';
       updateStartBtn();
     });
 
+    // Sala online: preenche o elenco compartilhado.
+    window.addEventListener('divertex:roster', e => {
+      if (e.detail?.game !== 'verdade') return;
+      state.players = (e.detail.players || []).slice(0, 10).map(name => ({ name, lives: 3 }));
+      renderPlayerChips();
+      updateStartBtn();
+    });
+
     // Start
     $('vcStartBtn')?.addEventListener('click', () => {
       if (state.players.length < 2) return;

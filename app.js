@@ -1901,6 +1901,22 @@
     renderAll();
   }
 
+  // Sala online: substitui o elenco pelos jogadores compartilhados da sala.
+  window.addEventListener("divertex:roster", (e) => {
+    if (e.detail?.game !== "wheel") return;
+    const lives = clamp(Number(els.livesInput?.value) || 3, 1, 20);
+    const user = window.DivertexUser;
+    state.players = (e.detail.players || []).slice(0, 16).map((name) => ({
+      id: randomId(),
+      name: String(name).trim(),
+      lives,
+      maxLives: lives,
+      isMe: Boolean(user?.name && name === user.name),
+    }));
+    state.selectedPlayerId = null;
+    renderAll();
+  });
+
   function decLife(id) {
     const p = state.players.find((x) => x.id === id);
     if (!p) return { eliminated: false, player: null };

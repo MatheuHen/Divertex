@@ -243,6 +243,14 @@ import { submitGameStats } from './game-service.js';
       updateStartBtn();
     });
 
+    // Sala online: preenche o elenco compartilhado.
+    window.addEventListener('divertex:roster', e => {
+      if (e.detail?.game !== 'mestre') return;
+      state.players = (e.detail.players || []).slice(0, 12).map(name => ({ name, lives: 3 }));
+      renderPlayerChips();
+      updateStartBtn();
+    });
+
     $('mrStartBtn')?.addEventListener('click', () => {
       if (state.players.length < 3) return;
       state.gameStarted = true;
