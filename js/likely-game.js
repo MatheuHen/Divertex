@@ -1,5 +1,6 @@
 // js/likely-game.js — "Quem é Mais Provável" minigame
 import { submitGameStats } from './game-service.js';
+import Room from './realtime-room.js';
 
 const QUESTIONS = [
   // Cotidiano
@@ -97,6 +98,20 @@ const FUNNY_MSGS = [
     votes: {},
   };
 
+  // ─── Estado do modo ONLINE (sala com voto secreto por celular) ────────────
+  // online: jogando "likely" dentro de uma sala. host: este aparelho conduz.
+  // roundId: cresce a cada rodada — descarta eventos atrasados de rodadas velhas.
+  // roundVotes: { voterId: nomeEscolhido } coletado pelo host na rodada atual.
+  // myVote: nome em que ESTE aparelho votou na rodada (null = ainda não votou).
+  let online = false, isHost = false, roundId = 0, revealed = false;
+  let roundVotes = {};
+  let myVote = null;
+  let roomUnsub = null;
+
+  const _myId = () => window.DivertexUser?.id || 'host';
+  const _voterTotal = () => (Room.isActive() ? Math.max(1, Room.getMembers().length) : 1);
+  const _broadcast = (kind, payload) => { try { Room.syncEvent(kind, payload); } catch { /* noop */ } };
+
   const phases = {
     setup: $('likelySetup'),
     question: $('likelyQuestion'),
@@ -106,6 +121,7 @@ const FUNNY_MSGS = [
 
   function showPhase(name) {
     Object.values(phases).forEach(el => el?.setAttribute('hidden', ''));
+    $('likelyWaiting')?.setAttribute('hidden', '');
     phases[name]?.removeAttribute('hidden');
     state.phase = name;
   }
@@ -122,6 +138,7 @@ const FUNNY_MSGS = [
   function goToMenu() {
     $('screenLikely').classList.remove('screen--active');
     $('screenMenu').classList.add('screen--active');
+    _leaveOnline();
     state = { phase: 'setup', players: [], round: 0, totalRounds: 5, questionQueue: [], currentQuestion: '', votes: {} };
     renderSetup();
     showPhase('setup');
@@ -187,12 +204,12 @@ const FUNNY_MSGS = [
     renderSetup();
   });
 
-  // Sala online: preenche o elenco compartilhado.
+  // Sala online: preenche o elenco compartilhado e entra no modo online.
   window.addEventListener('divertex:roster', e => {
     if (e.detail?.game !== 'likely') return;
     state.players = (e.detail.players || []).slice(0, 8)
       .map(name => ({ name, lives: LIVES, eliminated: false, isMe: window.DivertexUser?.name === name }));
-    renderSetup();
+    _enterOnline();
   });
 
   $('likelyAddSampleBtn')?.addEventListener('click', () => {
@@ -204,6 +221,7 @@ const FUNNY_MSGS = [
   });
 
   $('likelyStartBtn')?.addEventListener('click', () => {
+    if (online && !isHost) return; // na sala, só o host inicia
     if (state.players.length < 2) return;
     state.totalRounds = Math.max(3, Math.min(20, +($('likelyRoundsInput')?.value || 5)));
     state.questionQueue = shuffle(QUESTIONS);
@@ -224,6 +242,23 @@ const FUNNY_MSGS = [
     state.votes = {};
     active.forEach(p => { state.votes[p.name] = 0; });
 
+    // ── Online: abre rodada de voto secreto (host autoritativo) ──
+    if (online) {
+      roundId++;
+      revealed = false;
+      roundVotes = {};
+      myVote = null;
+      const payload = {
+        roundId, round: state.round, totalRounds: state.totalRounds,
+        question: state.currentQuestion, candidates: active.map(p => p.name),
+      };
+      _broadcast('lkv:round', payload);
+      _showVotePhase(payload);
+      _emitProgress(); // inicia o contador "0 de N votaram…"
+      return;
+    }
+
+    // ── Offline: votação local (passa o celular) ──
     const qRound = $('likelyQRound');
     const qText = $('likelyQText');
     if (qRound) qRound.textContent = `Rodada ${state.round} de ${state.totalRounds}`;
@@ -232,7 +267,197 @@ const FUNNY_MSGS = [
     showPhase('question');
   }
 
+  // ════════════════════════════════════════════════════════════════════════
+  //  MODO ONLINE — voto secreto por celular (host autoritativo)
+  // ════════════════════════════════════════════════════════════════════════
+
+  function _enterOnline() {
+    online = Room.isActive() && Room.getGame() === 'likely';
+    isHost = online && Room.isHost();
+    if (!online) { renderSetup(); return; }
+    window.DivertexSelfSync?.add('screenLikely');
+    _wireRoomVoting();
+    roundId = 0; revealed = false; roundVotes = {}; myVote = null;
+    if (isHost) renderSetup();                  // host configura rodadas e inicia
+    else _renderGuestWaiting('Aguardando o host iniciar a partida…');
+  }
+
+  function _leaveOnline() {
+    window.DivertexSelfSync?.delete('screenLikely');
+    online = false; isHost = false;
+    roundVotes = {}; myVote = null; revealed = false;
+    $('likelyWaiting')?.setAttribute('hidden', '');
+  }
+
+  // Liga os eventos da sala uma única vez por carga de página.
+  function _wireRoomVoting() {
+    if (roomUnsub) return;
+    roomUnsub = Room.on('event', (e) => {
+      const { kind, payload } = e.detail || {};
+      if (!online) return;
+      if (kind === 'lkv:round') { if (!isHost) _onRound(payload); }
+      else if (kind === 'lkv:vote') { if (isHost) _recordVote(payload.roundId, payload.voterId, payload.choice); }
+      else if (kind === 'lkv:progress') { if (!isHost) _updateProgress(payload.voted, payload.total); }
+      else if (kind === 'lkv:reveal') { if (!isHost) { revealed = true; renderReveal(payload); } }
+      else if (kind === 'lkv:final') { if (!isHost) { renderFinal(payload); _submitMyStats(payload); } }
+    });
+    // Se alguém entra/sai durante a votação, recalcula se já votaram todos.
+    Room.on('members', () => { if (online && isHost && state.phase === 'question') _checkComplete(); });
+  }
+
+  // Convidado: recebeu uma nova rodada do host.
+  function _onRound(p) {
+    if (isHost) return;
+    roundId = p.roundId;
+    revealed = false;
+    myVote = null;
+    state.round = p.round;
+    state.totalRounds = p.totalRounds;
+    _showVotePhase(p);
+  }
+
+  function _renderGuestWaiting(text) {
+    let w = $('likelyWaiting');
+    if (!w) {
+      w = document.createElement('div');
+      w.id = 'likelyWaiting';
+      w.className = 'lk-phase';
+      (phases.setup?.parentElement || $('screenLikely'))?.appendChild(w);
+    }
+    w.innerHTML = `
+      <div class="lk-q-wrap"><div class="card lk-q-card" style="text-align:center">
+        <div class="lk-round-badge">🎮 Sala online</div>
+        <div style="font-size:18px;font-weight:800;margin:22px 0 6px">${text}</div>
+        <div style="font-size:34px">⏳</div>
+      </div></div>`;
+    Object.values(phases).forEach(el => el?.setAttribute('hidden', ''));
+    w.removeAttribute('hidden');
+    state.phase = 'waiting';
+  }
+
+  // Tela de votação (host e convidados): cada um escolhe UM nome, em segredo.
+  function _showVotePhase(p) {
+    myVote = null;
+    if ($('likelyQRound')) $('likelyQRound').textContent = `Rodada ${p.round} de ${p.totalRounds}`;
+    if ($('likelyQText')) $('likelyQText').textContent = p.question;
+    const hint = document.querySelector('#likelyQuestion .lk-vote-hint');
+    if (hint) hint.textContent = '🤫 Vote em segredo — o resultado aparece quando todos votarem';
+
+    const grid = $('likelyVoteGrid');
+    if (grid) {
+      grid.innerHTML = '';
+      (p.candidates || []).forEach(name => {
+        const btn = document.createElement('button');
+        btn.className = 'lk-vote-btn';
+        btn.dataset.name = name;
+        btn.innerHTML = `<span class="lk-vote-btn__name">${name}</span><span class="lk-vote-btn__count">Votar</span>`;
+        btn.addEventListener('click', () => _castVote(name, p.roundId));
+        grid.appendChild(btn);
+      });
+    }
+    _setupOnlineQActions();
+    showPhase('question');
+  }
+
+  function _qActions() { return document.querySelector('#likelyQuestion .lk-q-actions'); }
+
+  // Restaura o botão "Revelar resultado" original (usado no offline).
+  function _resetQActionsOffline() {
+    const a = _qActions();
+    if (!a) return;
+    a.querySelector('#lkvProgress')?.remove();
+    a.querySelector('#lkvForceReveal')?.remove();
+    const rb = $('likelyRevealBtn');
+    if (rb) rb.style.display = '';
+  }
+
+  // Substitui o botão de revelar por um contador de votos (+ "Revelar agora" no host).
+  function _setupOnlineQActions() {
+    const a = _qActions();
+    if (!a) return;
+    const rb = $('likelyRevealBtn');
+    if (rb) rb.style.display = 'none';
+    let prog = a.querySelector('#lkvProgress');
+    if (!prog) {
+      prog = document.createElement('div');
+      prog.id = 'lkvProgress';
+      prog.className = 'lk-vote-hint';
+      a.appendChild(prog);
+    }
+    prog.textContent = `0 de ${_voterTotal()} votaram…`;
+    let fr = a.querySelector('#lkvForceReveal');
+    if (isHost) {
+      if (!fr) {
+        fr = document.createElement('button');
+        fr.id = 'lkvForceReveal';
+        fr.className = 'btn btn--soft btn--sm';
+        fr.type = 'button';
+        fr.textContent = 'Revelar agora';
+        fr.addEventListener('click', _hostReveal);
+        a.appendChild(fr);
+      }
+      fr.style.display = '';
+    } else if (fr) {
+      fr.remove();
+    }
+  }
+
+  function _castVote(name, rid) {
+    if (myVote || rid !== roundId) return; // um voto por rodada; ignora rodada velha
+    myVote = name;
+    const grid = $('likelyVoteGrid');
+    grid?.querySelectorAll('.lk-vote-btn').forEach(b => {
+      b.disabled = true;
+      const c = b.querySelector('.lk-vote-btn__count');
+      if (b.dataset.name === name) { b.classList.add('lk-vote-btn--voted'); if (c) c.textContent = 'Seu voto ✓'; }
+      else if (c) c.textContent = '';
+    });
+    window.DivertexSFX?.click?.();
+    _broadcast('lkv:vote', { roundId: rid, voterId: _myId(), choice: name });
+    if (isHost) _recordVote(rid, _myId(), name); // host conta o próprio voto (broadcast não volta para si)
+  }
+
+  // Host: registra um voto (dedup por votante) e checa se a rodada fechou.
+  function _recordVote(rid, voterId, choice) {
+    if (!isHost || rid !== roundId || revealed) return;
+    roundVotes[voterId] = choice;
+    _emitProgress();
+    _checkComplete();
+  }
+
+  function _emitProgress() {
+    if (!isHost) return;
+    const voted = Object.keys(roundVotes).length;
+    const total = _voterTotal();
+    _broadcast('lkv:progress', { roundId, voted, total });
+    _updateProgress(voted, total);
+  }
+
+  function _updateProgress(voted, total) {
+    const el = document.getElementById('lkvProgress');
+    if (el) el.textContent = voted >= total ? 'Revelando…' : `${voted} de ${total} votaram…`;
+  }
+
+  function _checkComplete() {
+    if (!isHost || revealed) return;
+    if (Object.keys(roundVotes).length >= _voterTotal()) _hostReveal();
+  }
+
+  // Host: apura os votos da rodada e transmite a revelação para todos.
+  function _hostReveal() {
+    if (!isHost || revealed) return;
+    revealed = true;
+    const active = state.players.filter(p => !p.eliminated);
+    state.votes = {};
+    active.forEach(p => { state.votes[p.name] = 0; });
+    Object.values(roundVotes).forEach(name => { if (name in state.votes) state.votes[name]++; });
+    const d = computeReveal();
+    renderReveal(d);
+    _broadcast('lkv:reveal', d);
+  }
+
   function renderVoteGrid() {
+    _resetQActionsOffline(); // restaura o botão "Revelar" caso venha de uma sala online
     const grid = $('likelyVoteGrid');
     if (!grid) return;
     const active = state.players.filter(p => !p.eliminated);
@@ -261,7 +486,10 @@ const FUNNY_MSGS = [
 
   $('likelyRevealBtn')?.addEventListener('click', revealResult);
 
-  function revealResult() {
+  // Apura o resultado da rodada (autoritativo: muta vidas/eliminação) e devolve
+  // um pacote de dados + HTML pronto para renderizar. No online, o host envia
+  // este pacote aos convidados para que vejam a MESMA revelação.
+  function computeReveal() {
     const active = state.players.filter(p => !p.eliminated);
     const total = Object.values(state.votes).reduce((a, b) => a + b, 0);
 
@@ -283,6 +511,48 @@ const FUNNY_MSGS = [
     const pct = totalVotes > 0 ? Math.round((maxV / totalVotes) * 100) : 0;
     const wasTie = tied.length > 1;
 
+    const votesText = wasTie
+      ? `Empate! ${maxV} voto${maxV > 1 ? 's' : ''} (${pct}%) — sorteado entre empatados`
+      : `${maxV} voto${maxV > 1 ? 's' : ''} — ${pct}% do grupo`;
+    const msg = loser.eliminated
+      ? `${loser.name} foi eliminado! 💀`
+      : FUNNY_MSGS[Math.floor(Math.random() * FUNNY_MSGS.length)];
+
+    const allPlayers = [...active].filter((p, i, arr) => arr.findIndex(x => x.name === p.name) === i);
+    const sortedB = allPlayers.sort((a, b) => (state.votes[b.name] || 0) - (state.votes[a.name] || 0));
+    const breakdownHtml = sortedB.map(p => {
+      const v = state.votes[p.name] || 0;
+      const isLoser = p.name === loser.name;
+      return `<div class="lk-breakdown-row${isLoser ? ' lk-breakdown-row--loser' : ''}">
+        <span>${p.name}</span>
+        <span class="lk-breakdown-v">${v} voto${v !== 1 ? 's' : ''}</span>
+        <span>${p.eliminated ? '💀' : '❤️'.repeat(p.lives)}</span>
+      </div>`;
+    }).join('');
+
+    const sortedS = [...state.players].sort((a, b) => b.lives - a.lives);
+    const scoreboardHtml = '<div class="lk-sb-title">Placar</div>' + sortedS.map(p => `
+      <div class="lk-sb-row${p.eliminated ? ' lk-sb-row--out' : ''}">
+        <span>${p.name}</span>
+        <span>${p.eliminated ? '💀 Eliminado' : '❤️'.repeat(p.lives)}</span>
+      </div>`).join('');
+
+    const activeAfter = state.players.filter(p => !p.eliminated);
+    const gameOver = activeAfter.length < 2 || state.round >= state.totalRounds;
+    const nextLabel = gameOver
+      ? '🏆 Ver resultado final'
+      : `Próxima rodada (${state.round + 1}/${state.totalRounds}) →`;
+
+    return {
+      loserName: loser.name, votesText, msg, breakdownHtml, scoreboardHtml,
+      nextLabel, gameOver, round: state.round, totalRounds: state.totalRounds,
+      players: state.players.map(p => ({ name: p.name, lives: p.lives, eliminated: p.eliminated })),
+    };
+  }
+
+  // Preenche a fase de revelação a partir do pacote de computeReveal. Serve para
+  // o host (dados locais) e para os convidados (dados recebidos pela sala).
+  function renderReveal(d) {
     const revealName = $('likelyRevealName');
     const revealVotes = $('likelyRevealVotes');
     const revealMsg = $('likelyRevealMsg');
@@ -291,56 +561,31 @@ const FUNNY_MSGS = [
     const nextBtn = $('likelyNextRoundBtn');
 
     if (revealName) {
-      revealName.textContent = loser.name;
+      revealName.textContent = d.loserName;
       revealName.classList.remove('lk-reveal-anim');
       void revealName.offsetWidth;
       revealName.classList.add('lk-reveal-anim');
     }
-    if (revealVotes) {
-      revealVotes.textContent = wasTie
-        ? `Empate! ${maxV} voto${maxV > 1 ? 's' : ''} (${pct}%) — sorteado entre empatados`
-        : `${maxV} voto${maxV > 1 ? 's' : ''} — ${pct}% do grupo`;
-    }
-    if (revealMsg) {
-      revealMsg.textContent = loser.eliminated
-        ? `${loser.name} foi eliminado! 💀`
-        : FUNNY_MSGS[Math.floor(Math.random() * FUNNY_MSGS.length)];
-    }
-
-    if (breakdown) {
-      const allPlayers = [...active].filter((p, i, arr) => arr.findIndex(x => x.name === p.name) === i);
-      const sorted = allPlayers.sort((a, b) => (state.votes[b.name] || 0) - (state.votes[a.name] || 0));
-      breakdown.innerHTML = sorted.map(p => {
-        const v = state.votes[p.name] || 0;
-        const isLoser = p.name === loser.name;
-        return `<div class="lk-breakdown-row${isLoser ? ' lk-breakdown-row--loser' : ''}">
-          <span>${p.name}</span>
-          <span class="lk-breakdown-v">${v} voto${v !== 1 ? 's' : ''}</span>
-          <span>${p.eliminated ? '💀' : '❤️'.repeat(p.lives)}</span>
-        </div>`;
-      }).join('');
-    }
-
-    if (scoreboard) {
-      const sorted = [...state.players].sort((a, b) => b.lives - a.lives);
-      scoreboard.innerHTML = '<div class="lk-sb-title">Placar</div>' + sorted.map(p => `
-        <div class="lk-sb-row${p.eliminated ? ' lk-sb-row--out' : ''}">
-          <span>${p.name}</span>
-          <span>${p.eliminated ? '💀 Eliminado' : '❤️'.repeat(p.lives)}</span>
-        </div>`).join('');
-    }
-
-    const activeAfter = state.players.filter(p => !p.eliminated);
+    if (revealVotes) revealVotes.textContent = d.votesText;
+    if (revealMsg) revealMsg.textContent = d.msg;
+    if (breakdown) breakdown.innerHTML = d.breakdownHtml;
+    if (scoreboard) scoreboard.innerHTML = d.scoreboardHtml;
     if (nextBtn) {
-      nextBtn.textContent = (activeAfter.length < 2 || state.round >= state.totalRounds)
-        ? '🏆 Ver resultado final'
-        : `Próxima rodada (${state.round + 1}/${state.totalRounds}) →`;
+      // Só o host avança a partida; convidados aguardam.
+      if (online && !isHost) { nextBtn.disabled = true; nextBtn.textContent = '⏳ Aguardando o host…'; }
+      else { nextBtn.disabled = false; nextBtn.textContent = d.nextLabel; }
     }
 
     showPhase('reveal');
   }
 
+  function revealResult() {
+    const d = computeReveal();
+    renderReveal(d);
+  }
+
   $('likelyNextRoundBtn')?.addEventListener('click', () => {
+    if (online && !isHost) return; // só o host avança a partida
     const active = state.players.filter(p => !p.eliminated);
     if (active.length < 2 || state.round >= state.totalRounds) showFinal();
     else nextRound();
@@ -348,54 +593,65 @@ const FUNNY_MSGS = [
 
   // ─── Final phase ──────────────────────────────────────────
 
-  function showFinal() {
+  function computeFinal() {
     const alive = state.players.filter(p => !p.eliminated);
     const winner = alive.length > 0
       ? alive.reduce((a, b) => b.lives > a.lives ? b : a)
       : [...state.players].reduce((a, b) => b.lives > a.lives ? b : a);
 
+    const sorted = [...state.players].sort((a, b) => {
+      if (a.eliminated !== b.eliminated) return a.eliminated ? 1 : -1;
+      return b.lives - a.lives;
+    });
+    const scoresHtml = sorted.map((p, i) => `
+      <div class="lk-final-row${i === 0 ? ' lk-final-row--winner' : ''}${p.eliminated ? ' lk-final-row--out' : ''}">
+        <span class="lk-final-rank">${i + 1}º</span>
+        <span>${p.name}</span>
+        <span>${p.eliminated ? '💀' : '❤️'.repeat(p.lives)}</span>
+      </div>`).join('');
+
+    return {
+      winnerName: winner.name, scoresHtml, round: state.round,
+      players: state.players.map(p => ({ name: p.name, lives: p.lives, eliminated: p.eliminated })),
+    };
+  }
+
+  function renderFinal(d) {
     const finalWinner = $('likelyFinalWinner');
     const finalScores = $('likelyFinalScores');
-
-    if (finalWinner) finalWinner.textContent = winner.name;
-
-    if (finalScores) {
-      const sorted = [...state.players].sort((a, b) => {
-        if (a.eliminated !== b.eliminated) return a.eliminated ? 1 : -1;
-        return b.lives - a.lives;
-      });
-      finalScores.innerHTML = sorted.map((p, i) => `
-        <div class="lk-final-row${i === 0 ? ' lk-final-row--winner' : ''}${p.eliminated ? ' lk-final-row--out' : ''}">
-          <span class="lk-final-rank">${i + 1}º</span>
-          <span>${p.name}</span>
-          <span>${p.eliminated ? '💀' : '❤️'.repeat(p.lives)}</span>
-        </div>`).join('');
-    }
-
+    if (finalWinner) finalWinner.textContent = d.winnerName;
+    if (finalScores) finalScores.innerHTML = d.scoresHtml;
     showPhase('final');
+  }
 
-    // Submete stats do usuário logado ao ranking
+  // Cada aparelho envia ao ranking os stats do PRÓPRIO jogador logado, usando o
+  // placar autoritativo do pacote final (no online vem do host; offline é local).
+  function _submitMyStats(d) {
     const user = window.DivertexUser;
-    if (user) {
-      const myPlayer = state.players.find(p => p.isMe);
-      if (myPlayer) {
-        const isWinner = !myPlayer.eliminated && myPlayer === winner;
-        const livesLost = LIVES - myPlayer.lives;
-        const score = isWinner
-          ? 120 + state.round * 8
-          : Math.max(0, state.round * 4 - livesLost * 5);
-        submitGameStats({
-          wins: isWinner ? 1 : 0,
-          rounds: state.round,
-          livesLost,
-          streak: state.round,
-          scoreDelta: score,
-        }).catch(() => {});
-      }
-    }
+    if (!user) return;
+    const mine = (d.players || []).find(p => p.name === user.name);
+    if (!mine) return;
+    const isWinner = !mine.eliminated && mine.name === d.winnerName;
+    const livesLost = LIVES - mine.lives;
+    const score = isWinner ? 120 + d.round * 8 : Math.max(0, d.round * 4 - livesLost * 5);
+    submitGameStats({
+      wins: isWinner ? 1 : 0,
+      rounds: d.round,
+      livesLost,
+      streak: d.round,
+      scoreDelta: score,
+    }).catch(() => {});
+  }
+
+  function showFinal() {
+    const d = computeFinal();
+    renderFinal(d);
+    if (online && isHost) _broadcast('lkv:final', d);
+    _submitMyStats(d);
   }
 
   $('likelyPlayAgainBtn')?.addEventListener('click', () => {
+    if (online && !isHost) return; // só o host reinicia a partida da sala
     state.players.forEach(p => { p.lives = LIVES; p.eliminated = false; });
     state.round = 0;
     state.questionQueue = shuffle(QUESTIONS);
@@ -411,6 +667,9 @@ const FUNNY_MSGS = [
     $('screenMenu').classList.remove('screen--active');
     const screen = $('screenLikely');
     screen.classList.add('screen--active');
+    // Abertura direta (fora de sala) é offline. Quando vem da sala, o evento
+    // divertex:roster dispara logo depois e religa o modo online.
+    if (!(Room.isActive() && Room.getGame() === 'likely')) _leaveOnline();
     state = { phase: 'setup', players: [], round: 0, totalRounds: 5, questionQueue: [], currentQuestion: '', votes: {} };
 
     // Auto-adiciona o usuário logado

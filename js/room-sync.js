@@ -12,6 +12,12 @@
 
 import Room from './realtime-room.js';
 
+// Telas que gerenciam a PRÓPRIA sincronização (ex.: voto secreto do "Quem é
+// Mais Provável"). O host não as transmite como espelho e o convidado não as
+// espelha — cada aparelho roda sua UI interativa. Os jogos registram/limpam
+// seus ids aqui ao entrar/sair do modo online.
+if (!window.DivertexSelfSync) window.DivertexSelfSync = new Set();
+
 const GAME_SCREEN_IDS = new Set([
   'screenWheel', 'screenLikely', 'screenLetters', 'screenNumbers', 'screenNames',
   'screenVerdade', 'screenCartas', 'screenDuelo', 'screenMestre',
@@ -32,7 +38,9 @@ function activeGameScreen() {
 function _broadcastNow() {
   if (!Room.isActive() || !Room.isHost()) return;
   const screen = activeGameScreen();
-  if (!screen) {
+  // Tela auto-sincronizada: não espelha (o jogo cuida da própria sync). Trata
+  // como "sem tela de jogo" para que convidados saiam do modo espectador.
+  if (!screen || window.DivertexSelfSync.has(screen.id)) {
     if (lastScreen) { lastScreen = ''; lastHtml = ''; Room.syncEvent('dom-end', {}); }
     return;
   }
@@ -92,6 +100,8 @@ function _exitSpectator() {
 }
 
 function _applyMirror(screenId, html) {
+  // Ignora espelho de telas auto-sincronizadas (caso chegue um evento atrasado).
+  if (window.DivertexSelfSync.has(screenId)) return;
   const screen = document.getElementById(screenId);
   if (!screen) return;
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('screen--active'));
