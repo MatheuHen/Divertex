@@ -83,8 +83,10 @@ export async function signInWithGoogle() {
   const { error } = await sb.auth.signInWithOAuth({
     provider: 'google',
     options: {
+      // Sem prompt:'consent' nem access_type:'offline': forçavam a tela de
+      // permissões do Google a cada login e pediam um refresh token que o app
+      // não usa. Sem eles, quem já autorizou entra direto.
       redirectTo: `${window.location.origin}/auth/callback`,
-      queryParams: { access_type: 'offline', prompt: 'consent' },
     },
   });
   if (error) return { error: translateError(error.message) };
