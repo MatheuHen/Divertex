@@ -4609,9 +4609,14 @@ body.roomPanel-open { overflow: hidden; }
 /* Micro-interacao: feedback de toque */
 .btn--big:active, .btn--google:active { transform: scale(.985); }
 
-/* ── Sincronizacao ao vivo: modo espectador (convidado) ── */
-body.room-spectator .screen--active { pointer-events: none; }
+/* ── Sincronizacao ao vivo: jogo conjunto (convidado) ── */
+/* Convidado PODE tocar: o toque é encaminhado ao host (room-sync _onGuestTap).
+   Inputs de texto ficam desativados pois a digitação não é encaminhada. */
+body.room-spectator .screen--active input,
+body.room-spectator .screen--active textarea { pointer-events: none; }
 body.room-spectator { padding-top: 44px; }
+.room-tap { animation: roomTap .28s ease; }
+@keyframes roomTap { 0% { transform: scale(1); } 45% { transform: scale(0.94); filter: brightness(1.25); } 100% { transform: scale(1); } }
 #roomSpectatorBar {
   position: fixed; top: 0; left: 0; right: 0; z-index: 8500;
   display: flex; align-items: center; justify-content: center; gap: 12px;

@@ -1,13 +1,20 @@
 /**
- * room-sync.js — Sincronização AO VIVO de partidas nas salas online.
+ * room-sync.js — Sincronização AO VIVO + jogo conjunto nas salas online.
  *
  * Modelo host-autoritativo (espelho ao vivo): o host conduz o jogo e cada
- * mudança da tela ativa (votos, giros, revelações, placar, cartas, turnos) é
- * transmitida para todos os convidados, que veem exatamente a mesma tela em
- * tempo real (somente leitura). Funciona de forma uniforme em TODOS os jogos
- * porque sincroniza a própria interface, sem reescrever a lógica de cada jogo.
+ * mudança da tela ativa é transmitida para todos os convidados, que veem
+ * exatamente a mesma tela em tempo real. Funciona de forma uniforme em TODOS os
+ * jogos porque sincroniza a própria interface, sem reescrever cada jogo.
  *
- * Botões de giro disparam um efeito "girando" + som em todos os aparelhos.
+ * JOGO CONJUNTO (interativo): o convidado também JOGA — ao tocar num elemento da
+ * tela espelhada, o toque é reenviado ao host (evento 'cmd' com o caminho do
+ * elemento), o host executa o clique de verdade na sua própria árvore (lógica
+ * autoritativa roda) e a tela atualizada volta espelhada para todos. Assim
+ * qualquer um gira a roleta, sorteia, escolhe e avança turnos — em todos os
+ * minigames, sem reescrever nenhum. Navegação (voltar ao menu) fica local.
+ *
+ * Exceção: telas em window.DivertexSelfSync (ex.: voto secreto do "Quem é Mais
+ * Provável") cuidam da própria sync e não passam por aqui.
  */
 
 import Room from './realtime-room.js';
@@ -79,7 +86,7 @@ function _enterSpectator() {
   if (!bar) {
     bar = document.createElement('div');
     bar.id = 'roomSpectatorBar';
-    bar.innerHTML = `<span class="roomSpectatorBar__txt">👁 Você está vendo o jogo do host ao vivo</span>
+    bar.innerHTML = `<span class="roomSpectatorBar__txt">🎮 Jogando junto — toque para participar</span>
       <button id="roomSpectatorLeave" class="btn btn--ghost btn--sm" type="button">Sair</button>`;
     document.body.appendChild(bar);
     bar.querySelector('#roomSpectatorLeave').addEventListener('click', async () => {
@@ -116,15 +123,89 @@ export function initRoomSync() {
 
   Room.on('event', (e) => {
     const { kind, payload } = e.detail || {};
-    if (Room.isHost()) return; // host não espelha a si mesmo
+    if (Room.isHost()) {
+      // Host: executa os toques que os convidados enviaram (jogo conjunto).
+      if (kind === 'cmd') _replayCmd(payload);
+      return;
+    }
+    // Convidado: aplica o espelho da tela do host.
     if (kind === 'dom') { _applyMirror(payload.screen, payload.html); }
     else if (kind === 'dom-end') { _exitSpectator(); }
     else if (kind === 'fx-spin') { window.DivertexSFX?.spin(); _flashSpin(); }
   });
 
+  // Convidado: encaminha toques na tela espelhada para o host (fase de captura,
+  // para neutralizar qualquer handler local antes que dispare).
+  document.addEventListener('click', _onGuestTap, true);
+
   // Ao sair/encerrar a sala, garante saída do modo espectador.
   Room.on('closed', _exitSpectator);
   Room.on('status', () => { if (!Room.isActive() && spectating) _exitSpectator(); });
+}
+
+// ─── Jogo conjunto: convidado encaminha toque, host executa ─────────────────
+
+// Navegação/saída fica local (não controla o host). O convidado usa "Sair".
+function _isNavControl(el) {
+  return /backmenu|backtomenu|menubtn|leavebtn/i.test(el.id || '');
+}
+
+// Acha o elemento "clicável" a partir do alvo: botão, .btn, [data-name],
+// [role=button] ou qualquer elemento com id e cursor de ponteiro (ex.: divs
+// clicáveis como o "revelar regra" do Mestre da Rodada).
+function _interactiveTarget(target, screen) {
+  let el = target.closest('button, .btn, [role="button"], [data-name]');
+  if (el && screen.contains(el)) return el;
+  let n = target;
+  while (n && n !== screen) {
+    if (n.id && getComputedStyle(n).cursor === 'pointer') return n;
+    n = n.parentElement;
+  }
+  return null;
+}
+
+// Caminho posicional (índices de elementos-filho) da raiz até o elemento.
+// Como o espelho copia o innerHTML idêntico, o mesmo caminho resolve no host.
+function _nodePath(root, el) {
+  const path = [];
+  let node = el;
+  while (node && node !== root) {
+    const parent = node.parentElement;
+    if (!parent) return null;
+    path.unshift(Array.prototype.indexOf.call(parent.children, node));
+    node = parent;
+  }
+  return node === root ? path : null;
+}
+
+function _onGuestTap(e) {
+  if (!spectating || Room.isHost()) return;
+  const screen = document.querySelector('.screen.screen--active');
+  if (!screen || !screen.contains(e.target)) return;
+  const el = _interactiveTarget(e.target, screen);
+  if (!el || _isNavControl(el)) return; // sem alvo útil ou é navegação → deixa local
+  const path = _nodePath(screen, el);
+  if (!path) return;
+  // Bloqueia o handler local do convidado e manda o comando ao host.
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  Room.syncEvent('cmd', { screen: screen.id, path });
+  _tapPulse(el);
+}
+
+// Host: resolve o caminho na própria árvore e dispara o clique real.
+function _replayCmd({ screen: screenId, path }) {
+  if (!Array.isArray(path)) return;
+  const screen = document.getElementById(screenId);
+  if (!screen || !screen.classList.contains('screen--active')) return;
+  if (window.DivertexSelfSync.has(screenId)) return;
+  let node = screen;
+  for (const idx of path) { node = node && node.children && node.children[idx]; if (!node) return; }
+  if (node && typeof node.click === 'function') node.click();
+}
+
+function _tapPulse(el) {
+  el.classList.remove('room-tap'); void el.offsetWidth; el.classList.add('room-tap');
 }
 
 function _flashSpin() {
