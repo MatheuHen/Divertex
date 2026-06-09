@@ -9,3 +9,15 @@ dist/
 Thumbs.db
 
 .vercel
+
+# Artefatos de teste/preview (screenshots, logs, smoke tests, ferramentas locais)
+*.png
+*.log
+smoke-*.mjs
+test-*.mjs
+test-google-auth.mjs
+verify-screenshots/
+@vite/
+.claude/
+.trae/
+.vscode/

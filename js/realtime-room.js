@@ -83,6 +83,7 @@ async function _subscribe(code, asHost) {
     emitStatus();
   });
   channel.on('broadcast', { event: 'event' }, ({ payload }) => emit('event', payload));
+  channel.on('broadcast', { event: 'kick' }, ({ payload }) => emit('kicked', payload || {}));
   channel.on('broadcast', { event: 'closed' }, ({ payload }) => { _teardown(); emit('closed', payload || {}); });
 
   await new Promise((resolve, reject) => {
@@ -194,7 +195,18 @@ const DivertexRoom = {
   syncEvent(kind, payload) {
     if (!state.channel) return;
     const self = me();
-    state.channel.send({ type: 'broadcast', event: 'event', payload: { kind, payload, from: self.id, name: self.name } });
+    try {
+      state.channel.send({ type: 'broadcast', event: 'event', payload: { kind, payload, from: self.id, name: self.name } });
+    } catch (e) { console.warn('[Divertex] syncEvent falhou:', e?.message); }
+  },
+
+  // Expulsa um jogador (apenas o host). O alvo recebe 'kicked' e sai da sala.
+  async kick(memberId) {
+    if (!state.isHost || !state.channel || !memberId) return;
+    const self = me();
+    try {
+      await state.channel.send({ type: 'broadcast', event: 'kick', payload: { id: memberId, by: self.id } });
+    } catch (e) { console.warn('[Divertex] kick falhou:', e?.message); }
   },
 };
 

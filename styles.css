@@ -4571,6 +4571,9 @@ body.roomPanel-open { overflow: hidden; }
 .roomMember__avFallback { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #04121a; background: linear-gradient(135deg, var(--accent), var(--accent2)); }
 .roomMember__name { flex: 1; font-weight: 700; font-size: 14px; }
 .roomMember__host { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: #04121a; background: var(--accent); padding: 2px 7px; border-radius: 999px; }
+.roomMember__kick { flex: none; border: 1px solid var(--cardBorder); background: var(--bg2); color: var(--muted); width: 26px; height: 26px; border-radius: 8px; font-weight: 800; cursor: pointer; line-height: 1; transition: all .15s ease; }
+.roomMember__kick:hover { background: #ff3d5a; border-color: #ff3d5a; color: #fff; }
+.roomMember__kick--confirm { width: auto; padding: 0 10px; background: #ff3d5a; border-color: #ff3d5a; color: #fff; font-size: 12px; }
 
 .roomWaiting { text-align: center; padding: 16px; color: var(--muted); background: var(--bg1); border: 1px dashed var(--cardBorder); border-radius: 14px; animation: waitPulse 1.8s ease-in-out infinite; }
 @keyframes waitPulse { 0%,100% { opacity: .65; } 50% { opacity: 1; } }
@@ -4617,6 +4620,16 @@ body.room-spectator .screen--active textarea { pointer-events: none; }
 body.room-spectator { padding-top: 44px; }
 .room-tap { animation: roomTap .28s ease; }
 @keyframes roomTap { 0% { transform: scale(1); } 45% { transform: scale(0.94); filter: brightness(1.25); } 100% { transform: scale(1); } }
+
+/* Convidado aguardando o host iniciar a partida (cobre a tela espelhada,
+   abaixo da barra "Sair" para que ele ainda possa sair se quiser). */
+#roomAwaitOverlay { position: fixed; inset: 44px 0 0 0; z-index: 8400; display: grid; place-items: center; padding: 24px;
+  background: radial-gradient(circle at 50% 40%, rgba(10,14,30,.82), rgba(4,6,16,.94)); backdrop-filter: blur(6px); }
+#roomAwaitOverlay[hidden] { display: none; }
+.roomAwait__card { text-align: center; max-width: 340px; }
+.roomAwait__spin { font-size: 52px; animation: waitPulse 1.6s ease-in-out infinite; }
+.roomAwait__txt { margin-top: 14px; font-size: 19px; font-weight: 800; color: #fff; }
+.roomAwait__sub { margin-top: 8px; font-size: 13px; color: rgba(255,255,255,.7); }
 #roomSpectatorBar {
   position: fixed; top: 0; left: 0; right: 0; z-index: 8500;
   display: flex; align-items: center; justify-content: center; gap: 12px;

@@ -140,7 +140,7 @@ function _renderRoom(view) {
       <div class="roomSection__title">Escolha um jogo para todos</div>
       <div id="roomGamePicker" class="roomGamePicker"></div>
     ` : `
-      <div class="roomWaiting" id="roomWaiting">⏳ Aguardando o host escolher um jogo…</div>
+      <div class="roomWaiting" id="roomWaiting">⏳ Aguardando o host iniciar a partida…</div>
     `}
 
     <div class="roomSection__title">Chat</div>
@@ -153,6 +153,24 @@ function _renderRoom(view) {
   membersEl = view.querySelector('#roomMembers');
   chatBody = view.querySelector('#roomChat');
   _renderMembers(Room.getMembers());
+
+  // Expulsar jogador (host): 1º clique pede confirmação, 2º confirma.
+  membersEl.addEventListener('click', e => {
+    const btn = e.target.closest('[data-kick]');
+    if (!btn || !Room.isHost()) return;
+    const id = btn.dataset.kick;
+    const member = Room.getMembers().find(x => x.id === id);
+    if (btn.dataset.confirm === '1') {
+      Room.kick(id);
+      _toast(`${member?.name || 'Jogador'} foi removido da sala.`);
+      window.DivertexSFX?.click?.();
+    } else {
+      btn.dataset.confirm = '1';
+      btn.textContent = 'Remover?';
+      btn.classList.add('roomMember__kick--confirm');
+      setTimeout(() => { if (btn.isConnected) { btn.dataset.confirm = ''; btn.textContent = '✕'; btn.classList.remove('roomMember__kick--confirm'); } }, 3000);
+    }
+  });
 
   view.querySelector('#roomLeaveBtn').addEventListener('click', async () => {
     window.DivertexSFX?.leave();
@@ -190,11 +208,16 @@ function _renderMembers(list) {
   if (!membersEl) return;
   const countEl = document.getElementById('roomCount');
   if (countEl) countEl.textContent = list.length;
+  const iAmHost = Room.isHost();
   membersEl.innerHTML = list.map(m => {
     const av = m.avatar ? `<img src="${esc(m.avatar)}" alt="" class="roomMember__av">`
                         : `<span class="roomMember__avFallback">${esc((m.name || 'J')[0].toUpperCase())}</span>`;
     const mine = window.DivertexUser && m.id === window.DivertexUser.id;
-    return `<div class="roomMember">${av}<span class="roomMember__name">${esc(m.name)}${mine ? ' (você)' : ''}</span>${m.isHost ? '<span class="roomMember__host">host</span>' : ''}</div>`;
+    // Só o host vê o botão de remover, e nunca em si mesmo nem em outro host.
+    const kick = (iAmHost && !m.isHost && !mine)
+      ? `<button class="roomMember__kick" data-kick="${esc(m.id)}" type="button" title="Remover da sala" aria-label="Remover ${esc(m.name)}">✕</button>`
+      : '';
+    return `<div class="roomMember">${av}<span class="roomMember__name">${esc(m.name)}${mine ? ' (você)' : ''}</span>${m.isHost ? '<span class="roomMember__host">host</span>' : ''}${kick}</div>`;
   }).join('') || '<div class="roomMember roomMember--empty">Ninguém ainda…</div>';
 }
 
@@ -251,6 +274,7 @@ function _wireRoomEvents() {
   });
   Room.on('chat', (e) => { _addChat(e.detail); if (!(window.DivertexUser && e.detail.from === window.DivertexUser.id)) window.DivertexSFX?.message(); });
   Room.on('game', (e) => { _navigateToGame(e.detail.game, e.detail.roster); });
+  Room.on('kicked', (e) => _handleKicked(e.detail || {}));
   Room.on('closed', () => {
     _toast('A sala foi encerrada pelo host.');
     window.DivertexSFX?.error();
@@ -273,6 +297,46 @@ function _navigateToGame(gameKey, roster) {
   setTimeout(() => {
     window.dispatchEvent(new CustomEvent('divertex:roster', { detail: { game: gameKey, players: names } }));
   }, 120);
+}
+
+// Jogador expulso: valida que veio do host, sai da sala, volta ao menu e avisa.
+function _handleKicked({ id, by }) {
+  const host = Room.getMembers().find(m => m.isHost);
+  if (by && host && by !== host.id) return; // só o host pode expulsar
+  if (!window.DivertexUser || id !== window.DivertexUser.id) return; // não fui eu
+  try { Room.leave(); } catch { /* noop */ }
+  _closePanel();
+  _exitToMenu();
+  _notifyKicked();
+}
+
+function _exitToMenu() {
+  document.body.classList.remove('room-spectator');
+  document.getElementById('roomSpectatorBar')?.setAttribute('hidden', '');
+  window.DivertexSelfSync?.delete?.('screenLikely');
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('screen--active'));
+  document.getElementById('screenMenu')?.classList.add('screen--active');
+}
+
+function _notifyKicked() {
+  document.getElementById('kickNotice')?.remove();
+  const m = document.createElement('div');
+  m.id = 'kickNotice';
+  m.className = 'modal';
+  m.setAttribute('role', 'dialog');
+  m.setAttribute('aria-modal', 'true');
+  m.innerHTML = `
+    <div class="modal__box" style="text-align:center">
+      <div style="font-size:42px;line-height:1">🚪</div>
+      <div class="modal__title">Removido da sala</div>
+      <p style="margin:8px 0 18px;opacity:.85">Você foi removido da sala pelo host.</p>
+      <button id="kickOkBtn" class="btn btn--big" type="button" style="width:100%">Entendi</button>
+    </div>`;
+  document.body.appendChild(m);
+  const close = () => m.remove();
+  m.querySelector('#kickOkBtn')?.addEventListener('click', close);
+  m.addEventListener('click', e => { if (e.target === m) close(); });
+  window.DivertexSFX?.error?.();
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

@@ -101,6 +101,7 @@ function _exitSpectator() {
   spectating = false;
   document.body.classList.remove('room-spectator');
   document.getElementById('roomSpectatorBar')?.setAttribute('hidden', '');
+  _hideAwaitOverlay();
   // volta ao menu
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('screen--active'));
   document.getElementById('screenMenu')?.classList.add('screen--active');
@@ -116,6 +117,44 @@ function _applyMirror(screenId, html) {
   // Só reescreve se mudou (evita resetar scroll/anim à toa).
   if (screen.innerHTML !== html) screen.innerHTML = html;
   _enterSpectator();
+  _updateAwaitOverlay(screen); // "Aguardando o host iniciar…" enquanto ele prepara
+}
+
+// ─── Convidado: aguarda o host iniciar (controle de início exclusivo) ───────
+function _visible(el) { return el && !el.hasAttribute('hidden') && el.offsetParent !== null; }
+
+// O host ainda está preparando se a fase de setup (id terminando em "Setup")
+// ou um botão "Começar jogo" (id com "start") está visível na tela espelhada.
+function _isHostSettingUp(screen) {
+  const setup = screen.querySelector('[id$="Setup"]');
+  if (_visible(setup)) return true;
+  const btns = screen.querySelectorAll('button, .btn');
+  for (const b of btns) { if (/start/i.test(b.id || '') && _visible(b)) return true; }
+  return false;
+}
+
+function _updateAwaitOverlay(screen) {
+  const awaiting = _isHostSettingUp(screen);
+  let ov = document.getElementById('roomAwaitOverlay');
+  if (awaiting) {
+    if (!ov) {
+      ov = document.createElement('div');
+      ov.id = 'roomAwaitOverlay';
+      ov.innerHTML = `<div class="roomAwait__card">
+        <div class="roomAwait__spin">⏳</div>
+        <div class="roomAwait__txt">Aguardando o host iniciar a partida…</div>
+        <div class="roomAwait__sub">A rodada começa automaticamente quando o host iniciar.</div>
+      </div>`;
+      document.body.appendChild(ov);
+    }
+    ov.removeAttribute('hidden');
+  } else if (ov) {
+    ov.setAttribute('hidden', '');
+  }
+}
+
+function _hideAwaitOverlay() {
+  document.getElementById('roomAwaitOverlay')?.setAttribute('hidden', '');
 }
 
 export function initRoomSync() {
@@ -145,9 +184,14 @@ export function initRoomSync() {
 
 // ─── Jogo conjunto: convidado encaminha toque, host executa ─────────────────
 
-// Navegação/saída fica local (não controla o host). O convidado usa "Sair".
-function _isNavControl(el) {
-  return /backmenu|backtomenu|menubtn|leavebtn/i.test(el.id || '');
+// Controles EXCLUSIVOS do host: iniciar partida, gerenciar jogadores e navegar.
+// Convidados não conseguem encaminhar esses toques (defesa, além do overlay de
+// espera). Para sair, o convidado usa o botão "Sair" da barra.
+function _isHostOnlyControl(el) {
+  const id = el.id || '';
+  const cls = el.className || '';
+  return /backmenu|backtomenu|menubtn|leavebtn|start|playagain|addsample|addme|reset/i.test(id)
+    || /chip__remove|__kick|__remove/i.test(typeof cls === 'string' ? cls : '');
 }
 
 // Acha o elemento "clicável" a partir do alvo: botão, .btn, [data-name],
@@ -183,7 +227,7 @@ function _onGuestTap(e) {
   const screen = document.querySelector('.screen.screen--active');
   if (!screen || !screen.contains(e.target)) return;
   const el = _interactiveTarget(e.target, screen);
-  if (!el || _isNavControl(el)) return; // sem alvo útil ou é navegação → deixa local
+  if (!el || _isHostOnlyControl(el)) return; // sem alvo útil ou é controle exclusivo do host
   const path = _nodePath(screen, el);
   if (!path) return;
   // Bloqueia o handler local do convidado e manda o comando ao host.
